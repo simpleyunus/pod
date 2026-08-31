@@ -1,5 +1,6 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { seedRtms } from './seed-rtms';
 
 const prisma = new PrismaClient();
 
@@ -69,6 +70,8 @@ async function main() {
       data: { passwordHash },
     });
   }
+
+  await seedRtms(prisma);
 
   console.log('Seeded reference data and users.');
   console.log(`Default password for all seeded users: ${DEFAULT_PASSWORD}`);
