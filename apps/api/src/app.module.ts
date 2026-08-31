@@ -14,6 +14,8 @@ import { HealthController } from './health/health.controller';
 import { ImportModule } from './import/import.module';
 import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { OperationsModule } from './operations/operations.module';
 import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferenceModule } from './reference/reference.module';
@@ -52,6 +54,8 @@ import { TrackingModule } from './tracking/tracking.module';
     PdfModule,
     FleetModule,
     ComplianceModule,
+    MaintenanceModule,
+    OperationsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
