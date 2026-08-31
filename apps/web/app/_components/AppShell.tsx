@@ -1,14 +1,19 @@
 'use client';
 
 import {
+  AlertOutlined,
   AppstoreOutlined,
   BarChartOutlined,
+  IdcardOutlined,
   ImportOutlined,
   KeyOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SafetyCertificateOutlined,
   TeamOutlined,
+  ToolOutlined,
+  TruckOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Form, Input, Layout, Menu, Modal, Typography, message } from 'antd';
 import api from '../_lib/api';
@@ -75,9 +80,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           { key: '/team', icon: <TeamOutlined />, label: 'Team' },
         ]
       : []),
+    // RTMS Fleet & Compliance. Grouped so the deals board above stays the
+    // primary surface — these are POD's own trucks, not customers' cars.
+    { type: 'divider' as const, key: 'rtms-divider', style: { margin: '10px 14px', background: 'rgba(255,255,255,0.07)' } },
+    { key: '/compliance', icon: <SafetyCertificateOutlined />, label: 'Compliance' },
+    { key: '/assets', icon: <TruckOutlined />, label: 'Assets' },
+    { key: '/drivers', icon: <IdcardOutlined />, label: 'Drivers' },
+    { key: '/maintenance', icon: <ToolOutlined />, label: 'Maintenance' },
+    { key: '/trips', icon: <AppstoreOutlined />, label: 'Trips' },
+    { key: '/incidents', icon: <AlertOutlined />, label: 'Incidents' },
   ];
 
-  const selectedKey = menuItems.find((m) => pathname.startsWith(m.key))?.key ?? '/fleet';
+  // Longest match wins, so /fleet does not swallow other routes.
+  const selectedKey =
+    menuItems
+      .filter((m): m is { key: string; icon: any; label: string } => 'label' in m)
+      .filter((m) => pathname === m.key || pathname.startsWith(m.key + '/'))
+      .sort((a, b) => b.key.length - a.key.length)[0]?.key ?? '/fleet';
 
   if (!checked) return <div style={{ minHeight: '100vh', background: '#F6F6F3' }} />;
 
