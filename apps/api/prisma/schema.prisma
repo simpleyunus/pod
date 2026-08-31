@@ -1,0 +1,426 @@
+// POD — vehicle import & delivery tracking platform
+// Core design rule: the spreadsheet tangled four independent facts into one
+// cell. Here they are modelled separately:
+//   1. Lead stage      -> Deal.leadStage (pre-sale funnel, nullable once a deal)
+//   2. Deal status     -> Deal.currentStatus + STATUS_CHANGE timeline events
+//   3. Location        -> Deal.currentLocation + LOCATION_CHANGE timeline events
+//   4. Payment status  -> derived from Payment rows, never a free-text guess
+// The TimelineEvent table is append-only and doubles as the audit log.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  CONSULTANT
+  VIEWER
+}
+
+enum LeadStage {
+  STILL_LOOKING
+  VALUATION_REQUESTED
+  PREVIEWS_SENT
+  AUCTION_IN_PROGRESS
+  ON_HOLD
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum TimelineType {
+  STATUS_CHANGE
+  LOCATION_CHANGE
+  NOTE
+  PAYMENT
+  DOCUMENT
+  MEDIA
+  SYSTEM
+}
+
+enum MediaKind {
+  PHOTO
+  VIDEO
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
+enum DocumentType {
+  NATIS
+  POLICE_CLEARANCE
+  ITAC
+  CBCA
+  SAD500
+  BILL_OF_LADING
+  SUPPLIER_INVOICE
+  SALES_INVOICE
+  OTHER
+}
+
+enum ImportBatchStatus {
+  UPLOADED
+  MAPPING
+  REVIEW
+  COMMITTED
+  ABANDONED
+}
+
+enum ImportRowStatus {
+  PENDING
+  NEEDS_REVIEW
+  RESOLVED
+  COMMITTED
+  SKIPPED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  INTERNAL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  LOGGED // stub provider: recorded but not actually sent
+  SKIPPED // e.g. no phone number / not opted in
+}
+
+// ─────────────────────────── Staff & clients ───────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  keycloakId   String?  @unique // linked on first login; seeded users link later
+  username     String?  @unique // local auth credential
+  passwordHash String? // bcrypt; null = cannot log in
+  fullName     String
+  email        String?  @unique
+  role         Role     @default(CONSULTANT)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dealsResponsible Deal[]          @relation("ConsultantDeals")
+  timelineEvents   TimelineEvent[]
+  payments         Payment[]
+  mediaUploads     MediaAsset[]
+  importBatches    ImportBatch[]
+}
+
+model Client {
+  id                String   @id @default(cuid())
+  fullName          String
+  phoneE164         String? // normalised to E.164 so WhatsApp works; deduped by importer
+  altPhone          String?
+  email             String?
+  country           String?
+  city              String?
+  preferredLanguage String   @default("en")
+  whatsappOptIn     Boolean  @default(false)
+  notes             String?
+  sageContactId     String? // Sage Business Cloud contact id, set on first push
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  deals           Deal[]
+  trackingLinks   TrackingLink[]
+  notifications   Notification[]
+  inboundMessages InboundMessage[]
+
+  @@index([phoneE164])
+  @@index([fullName])
+}
+
+// ─────────────────────── Reference data (from Sheet2) ───────────────────────
+// Lookup tables rather than enums: POD's own status/location lists are seeded
+// by the importer from their spreadsheet and stay editable by admins.
+
+model DealStatus {
+  id         String  @id @default(cuid())
+  name       String  @unique
+  sortOrder  Int     @default(0)
+  isTerminal Boolean @default(false) // e.g. Delivered / Completed
+  active     Boolean @default(true)
+
+  dealsCurrent   Deal[]          @relation("CurrentStatus")
+  timelineEvents TimelineEvent[]
+}
+
+model Location {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  country   String?
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  dealsCurrent   Deal[]          @relation("CurrentLocation")
+  timelineEvents TimelineEvent[]
+}
+
+// ─────────────────────────────── The deal ───────────────────────────────
+// MVP decision: vehicle fields live on Deal (one car = one deal in POD's
+// business). Split into a separate Vehicle table only if resale/reuse of the
+// same car across deals ever becomes real.
+
+model Deal {
+  id        String  @id @default(cuid())
+  reference String  @unique // human-friendly code, e.g. POD-2026-0042
+
+  clientId     String
+  client       Client  @relation(fields: [clientId], references: [id])
+  consultantId String?
+  consultant   User?   @relation("ConsultantDeals", fields: [consultantId], references: [id])
+
+  // Vehicle
+  make           String
+  model          String
+  year           Int?
+  registrationNo String?
+  vin            String?
+  colour         String?
+  mileageKm      Int?
+
+  // Route
+  supplier           String?
+  sourceCountry      String? // typically ZA
+  destinationCountry String?
+  destinationCity    String?
+
+  // Money — cross-border, so currency is always explicit
+  sellingPrice    Decimal? @db.Decimal(14, 2)
+  sellingCurrency String?  @db.Char(3)
+  costPrice       Decimal? @db.Decimal(14, 2) // internal only, role-gated in API
+  costCurrency    String?  @db.Char(3)
+  fxRateSnapshot  Decimal? @db.Decimal(14, 6) // rate captured at deal time
+
+  expectedDeliveryDate DateTime?
+
+  // Denormalised snapshots for a fast board; the timeline is the truth
+  currentStatusId   String?
+  currentStatus     DealStatus? @relation("CurrentStatus", fields: [currentStatusId], references: [id])
+  currentLocationId String?
+  currentLocation   Location?   @relation("CurrentLocation", fields: [currentLocationId], references: [id])
+
+  // Pre-sale funnel; null once the car is actually in motion
+  leadStage LeadStage?
+
+  sageInvoiceId String? // Sage sales_invoice id, set when pushed
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  timeline      TimelineEvent[]
+  payments      Payment[]
+  media         MediaAsset[]
+  documents     Document[]
+  trackingLinks TrackingLink[]
+  importRows    ImportRow[]
+  notifications Notification[]
+
+  @@index([clientId])
+  @@index([consultantId])
+  @@index([currentStatusId])
+  @@index([currentLocationId])
+  @@index([destinationCountry])
+  @@index([updatedAt]) // powers stalled-deal nudges later
+}
+
+// Append-only. Never updated, never deleted — this is also the audit log.
+model TimelineEvent {
+  id     String       @id @default(cuid())
+  dealId String
+  deal   Deal         @relation(fields: [dealId], references: [id])
+  type   TimelineType
+
+  statusId   String?
+  status     DealStatus? @relation(fields: [statusId], references: [id])
+  locationId String?
+  location   Location?   @relation(fields: [locationId], references: [id])
+
+  note      String?
+  meta      Json? // free-form payload (e.g. paymentId, documentId, import batch)
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model Payment {
+  id       String   @id @default(cuid())
+  dealId   String
+  deal     Deal     @relation(fields: [dealId], references: [id])
+  amount   Decimal  @db.Decimal(14, 2)
+  currency String   @db.Char(3)
+  method   String? // bank transfer, cash, EcoCash… kept as text for import fidelity
+  reference String?
+  paidAt   DateTime
+  note     String?
+
+  sagePaymentId String? // Sage contact_payment id, set when pushed
+
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([dealId])
+}
+
+model MediaAsset {
+  id         String     @id @default(cuid())
+  dealId     String
+  deal       Deal       @relation(fields: [dealId], references: [id])
+  kind       MediaKind
+  bucket     String
+  objectKey  String
+  mimeType   String
+  sizeBytes  Int
+  caption    String?
+  scanStatus ScanStatus @default(PENDING) // ClamAV verdict before anything is served
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([bucket, objectKey])
+  @@index([dealId])
+}
+
+model Document {
+  id       String       @id @default(cuid())
+  dealId   String
+  deal     Deal         @relation(fields: [dealId], references: [id])
+  type     DocumentType
+  label    String? // free label when type = OTHER
+  bucket   String?
+  objectKey String?
+  filename  String? // original filename of the uploaded file
+  mimeType  String?
+  sizeBytes Int?
+  scanStatus ScanStatus @default(PENDING) // only meaningful once a file is attached
+  visibleToClient Boolean @default(false) // shows up (and downloads) on the tracking page
+  fromClient      Boolean @default(false) // uploaded by the customer via their link
+  received Boolean      @default(false)
+  note     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([dealId])
+}
+
+// ───────────────────────── Client tracking portal ─────────────────────────
+// Phase 2 surface, but the schema ships now so nothing needs migrating later.
+
+model TrackingLink {
+  id           String    @id @default(cuid())
+  token        String    @unique // long random URL token
+  pinHash      String? // optional PIN, argon2 hash — never the PIN itself
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  dealId       String?
+  deal         Deal?     @relation(fields: [dealId], references: [id])
+  showPrices   Boolean   @default(false) // "You choose whether the customer sees these figures"
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  lastAccessAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([clientId])
+}
+
+// Every outbound message (WhatsApp or internal nudge), whatever the provider.
+// In log mode the row IS the demo: status LOGGED shows exactly what would go out.
+model Notification {
+  id                String              @id @default(cuid())
+  dealId            String?
+  deal              Deal?               @relation(fields: [dealId], references: [id])
+  clientId          String?
+  client            Client?             @relation(fields: [clientId], references: [id])
+  channel           NotificationChannel
+  toPhone           String?
+  template          String?
+  body              String
+  status            NotificationStatus  @default(PENDING)
+  providerMessageId String?
+  error             String?
+  createdAt         DateTime            @default(now())
+  sentAt            DateTime?
+
+  @@index([dealId])
+  @@index([createdAt])
+}
+
+// Sage Business Cloud OAuth tokens — single row, rotated on every refresh.
+model SageToken {
+  id           Int      @id @default(1)
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  businessName String?
+  connectedBy  String?
+  updatedAt    DateTime @updatedAt
+}
+
+// Raw inbound WhatsApp messages (two-way flow). Kept verbatim for audit.
+model InboundMessage {
+  id        String   @id @default(cuid())
+  fromPhone String
+  body      String
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  handled   Boolean  @default(false)
+  reply     String?
+  raw       Json?
+  createdAt DateTime @default(now())
+
+  @@index([fromPhone])
+}
+
+// ─────────────────────────── Guided Excel importer ───────────────────────────
+// upload -> detect sheets -> map columns -> normalise -> preview & resolve -> commit
+// Nothing is silently guessed; every ambiguity becomes a NEEDS_REVIEW row.
+
+model ImportBatch {
+  id           String            @id @default(cuid())
+  filename     String
+  bucket       String?
+  objectKey    String?
+  status       ImportBatchStatus @default(UPLOADED)
+  sheetName    String?
+  columnMap    Json? // spreadsheet column -> system field mapping, human-confirmed
+  uploadedById String?
+  uploadedBy   User?             @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime          @default(now())
+  committedAt  DateTime?
+
+  rows ImportRow[]
+}
+
+model ImportRow {
+  id       String          @id @default(cuid())
+  batchId  String
+  batch    ImportBatch     @relation(fields: [batchId], references: [id])
+  rowIndex Int
+  raw      Json // untouched cells, kept forever for traceability
+  mapped   Json? // normalised candidate record
+  issues   Json? // [{field, problem, suggestion}] e.g. implausible dates, mixed phone formats
+  status   ImportRowStatus @default(PENDING)
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+
+  @@unique([batchId, rowIndex])
+}

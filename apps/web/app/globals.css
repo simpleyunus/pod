@@ -1,0 +1,93 @@
+/* POD — "Ink & Signal" design system
+   Deep ink structure · one signal-orange accent · warm paper canvas */
+
+:root {
+  --canvas: #f6f6f3;
+  --card: #ffffff;
+  --border: #e9e9e4;
+  --divider: #f1f1ec;
+  --ink: #101828;
+  --text: #171b26;
+  --text-2: #616875;
+  --text-3: #98a0ac;
+  --signal: #e8503a;
+  --signal-deep: #c13a26;
+  --signal-tint: #fdede9;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--canvas);
+}
+
+::selection {
+  background: rgba(232, 80, 58, 0.16);
+}
+
+/* quiet scrollbars */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d6d6cf;
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #bfbfb7;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* tables: whisper-quiet headers, generous rows */
+.ant-table-thead > tr > th {
+  text-transform: uppercase;
+  font-size: 10.5px !important;
+  letter-spacing: 0.07em;
+  font-weight: 600 !important;
+  color: #98a0ac !important;
+  background: transparent !important;
+}
+.ant-table-thead > tr > th::before {
+  display: none; /* antd's header column separators */
+}
+.ant-table-tbody > tr > td {
+  border-color: #f1f1ec !important;
+}
+
+/* display face for overlay titles & buttons with presence */
+.ant-drawer-title,
+.ant-modal-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+.ant-btn {
+  font-weight: 600;
+}
+
+/* sidebar nav: signal bar on the active item */
+.pod-sider .ant-menu-item {
+  position: relative;
+}
+.pod-sider .ant-menu-item-selected::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 99px;
+  background: var(--signal);
+}
