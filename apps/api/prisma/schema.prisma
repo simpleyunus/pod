@@ -229,6 +229,7 @@ model Deal {
   trackingLinks TrackingLink[]
   importRows    ImportRow[]
   notifications Notification[]
+  assignments   Assignment[] // RTMS fleet module: trips moving this car
 
   @@index([clientId])
   @@index([consultantId])
@@ -423,4 +424,960 @@ model ImportRow {
   deal   Deal?   @relation(fields: [dealId], references: [id])
 
   @@unique([batchId, rowIndex])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//                    RTMS FLEET & COMPLIANCE MODULE
+// ═══════════════════════════════════════════════════════════════════════════
+// Additive module making POD auditable against RTMS (SANS 1395, 8 elements).
+//
+// Distinct from the imported-car `Deal`: an `Asset` is a truck POD OWNS, a
+// `Deal` is a car POD SELLS. `Assignment` is the only bridge between them.
+//
+// Design rules mirroring the core schema:
+//   1. Everything that expires is a ComplianceItem — one reminders engine, one
+//      RAG rollup, driven off `expiresOn`. Expiry dates are never scattered
+//      across models.
+//   2. Statuses / checklist items / compliance kinds are lookup tables, not
+//      enums, because admins keep editing them (same reason as DealStatus).
+//   3. FleetEvent is append-only, exactly like TimelineEvent. TimelineEvent
+//      itself cannot be reused: its `dealId` is required and FK'd to Deal.
+//   4. References to `User` and `FleetFile` are plain id columns rather than
+//      Prisma relations, deliberately — it keeps the existing User model
+//      untouched (back-relations would add 13 fields to it). Services resolve
+//      the names via batch lookup. Deal is the ONLY existing model edited.
+
+// ─────────────────────── Fleet enums (logic-bearing) ───────────────────────
+// These stay enums because code branches on them; the admin-editable lists
+// are the lookup *tables* further down.
+
+enum ComplianceOwnerType {
+  ASSET
+  DRIVER
+}
+
+// DERIVED, never hand-set: recomputed daily from expiresOn by the engine.
+enum ComplianceStatus {
+  VALID
+  DUE_SOON
+  EXPIRED
+}
+
+// The 8 RTMS elements — every record that proves something maps to one, so
+// the RAG dashboard can group by element.
+enum RtmsElement {
+  MANAGEMENT_COMMITMENT // 1
+  RISK_MANAGEMENT       // 2
+  VEHICLE_FITNESS       // 3
+  DRIVER_WELLNESS       // 4
+  LOAD_MANAGEMENT       // 5
+  JOURNEY_MANAGEMENT    // 6
+  INCIDENT_MANAGEMENT   // 7
+  MONITORING_REVIEW     // 8
+}
+
+enum InspectionOutcome {
+  PASS
+  FAIL
+  NA
+}
+
+enum CorrectiveActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  VERIFIED
+}
+
+// Outcome of the compliance-aware assignment gate.
+enum GateDecision {
+  PASS
+  FAIL
+  OVERRIDDEN
+}
+
+enum TyreAction {
+  FITTED
+  ROTATED
+  REPAIRED
+  REPLACED
+  SCRAPPED
+}
+
+enum FineStatus {
+  UNPAID
+  PAID
+  CONTESTED
+  WRITTEN_OFF
+}
+
+enum AuditPackStatus {
+  PENDING
+  BUILDING
+  READY
+  FAILED
+}
+
+// What a FleetFile is attached to — drives bucket prefix and retention.
+enum FleetFileKind {
+  COMPLIANCE_DOC
+  INSPECTION_PHOTO
+  INCIDENT_PHOTO
+  POD_SIGNATURE
+  POD_PHOTO
+  WORK_ORDER_DOC
+  MASS_CERTIFICATE
+  POLICY_DOC
+  REPORT_PDF
+}
+
+// FleetEvent is polymorphic across the module's entities.
+enum FleetEntityType {
+  ASSET
+  DRIVER
+  WORK_ORDER
+  INSPECTION
+  ASSIGNMENT
+  INCIDENT
+  COMPLIANCE_ITEM
+  CARRIER
+}
+
+enum FleetEventType {
+  STATUS_CHANGE
+  NOTE
+  DOCUMENT
+  SYSTEM
+  GATE_CHECK
+  GATE_OVERRIDE
+  INVESTIGATION
+  CORRECTIVE_ACTION
+  COMPLIANCE_CHANGE
+}
+
+// ───────────────────── Lookup tables (admin-editable) ─────────────────────
+// Seeded, then owned by admins — mirroring how DealStatus / Location work.
+
+model AssetType {
+  id        String  @id @default(cuid())
+  code      String  @unique // TRUCK_TRACTOR, CAR_CARRIER, TRAILER…
+  name      String
+  isTrailer Boolean @default(false)
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  assets Asset[]
+}
+
+// The heart of the module's configurability: every kind of thing that expires.
+// `requiredForOperation` is what the assignment gate reads — admins decide
+// which documents actually block a trip, without a code change.
+model ComplianceKind {
+  id                   String              @id @default(cuid())
+  code                 String              @unique // VEHICLE_LICENCE, COF, CBRTA_PERMIT, DRIVER_LICENCE, PRDP, MEDICAL, SERVICE_DUE…
+  name                 String
+  ownerType            ComplianceOwnerType
+  leadDaysDueSoon      Int                 @default(30) // configurable reminder lead time
+  requiredForOperation Boolean             @default(false) // blocks the gate when not VALID
+  rtmsElement          RtmsElement?
+  sortOrder            Int                 @default(0)
+  active               Boolean             @default(true)
+
+  items ComplianceItem[]
+
+  @@index([ownerType, active])
+}
+
+model WorkOrderStatus {
+  id         String  @id @default(cuid())
+  code       String  @unique // REQUESTED, APPROVED, IN_PROGRESS, AWAITING_PARTS, DONE, CLOSED
+  name       String
+  sortOrder  Int     @default(0)
+  isTerminal Boolean @default(false)
+  active     Boolean @default(true)
+
+  workOrders WorkOrder[]
+}
+
+model TripStatus {
+  id         String  @id @default(cuid())
+  code       String  @unique // PLANNED, GATE_BLOCKED, IN_PROGRESS, DELIVERED, CANCELLED
+  name       String
+  sortOrder  Int     @default(0)
+  isTerminal Boolean @default(false)
+  active     Boolean @default(true)
+
+  assignments Assignment[]
+}
+
+model IncidentStatus {
+  id         String  @id @default(cuid())
+  code       String  @unique // REPORTED, INVESTIGATING, ACTIONS_OPEN, CLOSED
+  name       String
+  sortOrder  Int     @default(0)
+  isTerminal Boolean @default(false)
+  active     Boolean @default(true)
+
+  incidents Incident[]
+}
+
+model IncidentCategory {
+  id        String  @id @default(cuid())
+  code      String  @unique // COLLISION, ROLLOVER, LOAD_SHIFT, NEAR_MISS, INJURY…
+  name      String
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  incidents Incident[]
+}
+
+// The daily pre-trip checklist, editable by admins rather than hardcoded.
+model InspectionItemDef {
+  id        String  @id @default(cuid())
+  code      String  @unique // TYRES, BRAKES, LIGHTS, COUPLING, LOAD_SECURING…
+  label     String
+  category  String? // grouping on the mobile form, e.g. "Under the bonnet"
+  critical  Boolean @default(false) // a failed critical item blocks departure
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  results InspectionResult[]
+}
+
+// ─────────────────────────── Files (MinIO + ClamAV) ───────────────────────────
+// Document/MediaAsset both require a dealId, so the fleet module needs its own
+// blob table. Same StorageService + ClamAvService, same rule: only CLEAN files
+// are ever served.
+
+model FleetFile {
+  id           String        @id @default(cuid())
+  kind         FleetFileKind
+  bucket       String
+  objectKey    String
+  filename     String?
+  mimeType     String
+  sizeBytes    Int
+  scanStatus   ScanStatus    @default(PENDING) // reuses the core ScanStatus enum
+  uploadedById String? // User.id — plain column, see header note
+  createdAt    DateTime      @default(now())
+
+  @@unique([bucket, objectKey])
+  @@index([kind])
+}
+
+// ─────────────────────────── Assets & drivers ───────────────────────────
+
+// A vehicle POD owns and operates. NOT a Deal car.
+model Asset {
+  id             String  @id @default(cuid())
+  code           String  @unique // internal fleet number, e.g. POD-T01
+  registrationNo String  @unique
+  vin            String?
+  typeId         String
+  type           AssetType @relation(fields: [typeId], references: [id])
+
+  make  String?
+  model String?
+  year  Int?
+
+  // Load management (element 5): the gate compares massLoaded against maxMassKg
+  tareMassKg            Int?
+  maxMassKg             Int // GVM — permissible maximum
+  maxCombinationMassKg  Int? // GCM where a combination applies
+
+  odometerKm Int      @default(0)
+  active     Boolean  @default(true)
+  retiredAt  DateTime?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  complianceItems  ComplianceItem[]
+  maintenancePlans MaintenancePlan[]
+  workOrders       WorkOrder[]
+  inspections      Inspection[]
+  assignments      Assignment[]
+  massRecords      TripMassRecord[]
+  incidents        Incident[]
+  fines            Fine[]
+  tyreRecords      TyreRecord[]
+  speedEvents      SpeedEvent[]
+
+  @@index([active])
+  @@index([typeId])
+}
+
+model Driver {
+  id         String    @id @default(cuid())
+  code       String    @unique // employee/driver number
+  fullName   String
+  phoneE164  String?
+  email      String?
+  dateOfBirth DateTime?
+  userId     String? // optional link to a User account — plain column
+  active     Boolean   @default(true)
+  hiredOn    DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Licence, PrDP, medical and the substance-policy ack are all ComplianceItems
+  // — nothing driver-expiry-related lives on this model by design.
+  complianceItems  ComplianceItem[]
+  assignments      Assignment[]
+  inspections      Inspection[]
+  incidents        Incident[]
+  fines            Fine[]
+  dutyRecords      DriverDutyRecord[]
+  routeAcks        RouteAcknowledgement[]
+  policyAcks       PolicyAcknowledgement[]
+  speedEvents      SpeedEvent[]
+
+  @@index([active])
+  @@index([fullName])
+}
+
+// ══════════════════ THE CORE PRIMITIVE ══════════════════
+// Every expiring fact in the system — vehicle licence, COF, CBRTA permit,
+// driver licence, PrDP, medical, service due, policy ack — is one of these.
+// `status` is DERIVED from expiresOn by the daily engine and persisted so it
+// stays indexable/queryable; nothing else may write it.
+//
+// The brief's {ownerType, ownerId} is refined into ownerType + nullable
+// assetId/driverId FKs: same semantics, but real referential integrity and
+// working Prisma includes. Services enforce exactly-one-owner.
+model ComplianceItem {
+  id        String              @id @default(cuid())
+  ownerType ComplianceOwnerType
+  assetId   String?
+  asset     Asset?              @relation(fields: [assetId], references: [id])
+  driverId  String?
+  driver    Driver?             @relation(fields: [driverId], references: [id])
+
+  kindId String
+  kind   ComplianceKind @relation(fields: [kindId], references: [id])
+
+  reference String? // licence / permit / certificate number
+  issuedOn  DateTime?
+  expiresOn DateTime? // null = does not expire; engine treats as VALID
+
+  status           ComplianceStatus @default(VALID) // DERIVED — engine-owned
+  statusComputedAt DateTime?
+
+  documentFileId String? // FleetFile.id — the scan of the certificate
+  notes          String?
+  archivedAt     DateTime? // superseded by a renewal
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([ownerType, status])
+  @@index([expiresOn])
+  @@index([assetId])
+  @@index([driverId])
+  @@index([kindId])
+}
+
+// ─────────────────── Vehicle fitness (RTMS element 3) ───────────────────
+
+// Interval by km AND/OR months — whichever falls first. The maintenance
+// service materialises the resulting SERVICE_DUE ComplianceItem.
+model MaintenancePlan {
+  id      String @id @default(cuid())
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id])
+  name    String @default("Routine service")
+
+  intervalKm     Int?
+  intervalMonths Int?
+
+  lastServiceOdoKm Int?
+  lastServiceDate  DateTime?
+
+  // Computed by the service from last* + interval*; whichever comes first wins.
+  nextDueOdoKm Int?
+  nextDueDate  DateTime?
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetId])
+}
+
+model WorkOrder {
+  id      String @id @default(cuid())
+  number  String @unique // WO-2026-0001
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id])
+
+  statusId String
+  status   WorkOrderStatus @relation(fields: [statusId], references: [id])
+
+  title       String
+  description String?
+  odometerKm  Int?
+
+  partsCost  Decimal? @db.Decimal(12, 2)
+  labourCost Decimal? @db.Decimal(12, 2)
+  currency   String   @default("ZAR") @db.Char(3)
+  supplier   String?
+
+  // Lifecycle timestamps: REQUESTED→APPROVED→IN_PROGRESS→AWAITING_PARTS→DONE→CLOSED
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  closedAt    DateTime?
+
+  requestedById String? // User.id
+  approvedById  String? // User.id
+
+  documentFileId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // A failed pre-trip check that raised this job
+  inspectionResults InspectionResult[]
+
+  @@index([assetId])
+  @@index([statusId])
+}
+
+// Daily pre-trip checklist. Optionally bound to the trip it clears.
+model Inspection {
+  id         String   @id @default(cuid())
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id])
+  driverId   String?
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+  assignmentId String? @unique
+  assignment Assignment? @relation(fields: [assignmentId], references: [id])
+
+  performedAt DateTime @default(now())
+  odometerKm  Int?
+  passed      Boolean  @default(true) // derived: no FAIL results
+  notes       String?
+  signatureFileId String? // FleetFile.id
+  createdAt   DateTime @default(now())
+
+  results InspectionResult[]
+
+  @@index([assetId, performedAt])
+}
+
+model InspectionResult {
+  id           String            @id @default(cuid())
+  inspectionId String
+  inspection   Inspection        @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         InspectionItemDef @relation(fields: [itemId], references: [id])
+
+  outcome      InspectionOutcome
+  note         String?
+  photoFileId  String? // FleetFile.id
+
+  // A failed item can raise a WorkOrder — this is that link.
+  workOrderId String?
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
+
+  @@unique([inspectionId, itemId])
+  @@index([itemId])
+}
+
+model TyreRecord {
+  id       String     @id @default(cuid())
+  assetId  String
+  asset    Asset      @relation(fields: [assetId], references: [id])
+  position String // LF, RF, LR1, RR2…
+  action   TyreAction
+
+  brand        String?
+  size         String?
+  serialNo     String?
+  treadDepthMm Decimal? @db.Decimal(4, 1)
+
+  fittedOn     DateTime?
+  fittedOdoKm  Int?
+  removedOn    DateTime?
+  removedOdoKm Int?
+
+  cost      Decimal? @db.Decimal(12, 2)
+  currency  String   @default("ZAR") @db.Char(3)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([assetId])
+}
+
+// ─────────────── Risk management (RTMS element 2) ───────────────
+
+model RiskAssessment {
+  id          String       @id @default(cuid())
+  title       String
+  scope       String?
+  rtmsElement RtmsElement?
+  version     Int          @default(1)
+  assessedOn  DateTime
+  reviewDueOn DateTime?
+  assessedById String? // User.id
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  hazards Hazard[]
+  routes  RouteRiskAssessment[]
+}
+
+model Hazard {
+  id               String @id @default(cuid())
+  riskAssessmentId String
+  riskAssessment   RiskAssessment @relation(fields: [riskAssessmentId], references: [id], onDelete: Cascade)
+
+  description String
+  likelihood  Int // 1-5
+  severity    Int // 1-5
+  riskRating  Int // likelihood × severity, computed on write
+  controls    String
+
+  residualLikelihood Int?
+  residualSeverity   Int?
+  residualRating     Int?
+  ownerUserId        String? // User.id
+
+  @@index([riskAssessmentId])
+}
+
+// A route a driver must acknowledge before departure (element 6 + 2).
+model RouteRiskAssessment {
+  id   String @id @default(cuid())
+  name String
+
+  // Reuses the EXISTING Location lookup by id. Plain columns rather than FKs
+  // so the existing Location model needs no back-relation fields; names are
+  // resolved from /api/reference/locations, which the web app already caches.
+  originLocationId      String?
+  destinationLocationId String?
+
+  description String?
+  distanceKm  Int?
+  version     Int      @default(1) // a bumped version invalidates prior acks
+  reviewDueOn DateTime?
+  active      Boolean  @default(true)
+
+  riskAssessmentId String?
+  riskAssessment   RiskAssessment? @relation(fields: [riskAssessmentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  acknowledgements RouteAcknowledgement[]
+  assignments      Assignment[]
+}
+
+model RouteAcknowledgement {
+  id                    String              @id @default(cuid())
+  routeRiskAssessmentId String
+  route                 RouteRiskAssessment @relation(fields: [routeRiskAssessmentId], references: [id], onDelete: Cascade)
+  driverId              String
+  driver                Driver              @relation(fields: [driverId], references: [id])
+
+  version         Int // the route version acknowledged; gate compares to current
+  acknowledgedAt  DateTime @default(now())
+  signatureFileId String?
+
+  @@unique([routeRiskAssessmentId, driverId, version])
+  @@index([driverId])
+}
+
+// ─────────────── Journey management (RTMS element 6) ───────────────
+
+// External haulier register.
+model Carrier {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  contactName String?
+  phoneE164   String?
+  email       String?
+  fleetSize   Int?
+  routes      String? // free text: routes they cover
+  ratePerKm   Decimal? @db.Decimal(12, 2)
+  currency    String   @default("ZAR") @db.Char(3)
+  complianceNotes String?
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments Assignment[]
+}
+
+// The Trip. The ONE bridge between the fleet module and the existing Deal.
+model Assignment {
+  id        String @id @default(cuid())
+  reference String @unique // TRIP-2026-0001
+
+  // The car being moved — optional, since repositioning trips carry no deal.
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  carrierId String?
+  carrier   Carrier? @relation(fields: [carrierId], references: [id])
+
+  statusId String
+  status   TripStatus @relation(fields: [statusId], references: [id])
+
+  originLocationId      String? // Location.id — see RouteRiskAssessment note
+  destinationLocationId String?
+
+  routeRiskAssessmentId String?
+  route                 RouteRiskAssessment? @relation(fields: [routeRiskAssessmentId], references: [id])
+
+  plannedDepartureAt DateTime?
+  actualDepartureAt  DateTime?
+  plannedArrivalAt   DateTime?
+  actualArrivalAt    DateTime?
+  distanceKm         Int?
+
+  // Proof of delivery capture (mobile)
+  podCapturedAt      DateTime?
+  podReceivedByName  String?
+  podSignatureFileId String?
+  podNotes           String?
+
+  // Compliance-aware gate outcome; per-check reasons live in gateChecks
+  gateDecision       GateDecision?
+  gateCheckedAt      DateTime?
+  gateOverrideReason String?
+  gateOverriddenById String? // User.id — ADMIN only
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  legs        AssignmentLeg[]
+  gateChecks  AssignmentGateCheck[]
+  massRecords TripMassRecord[]
+  inspection  Inspection?
+  incidents   Incident[]
+  fines       Fine[]
+  speedEvents SpeedEvent[]
+
+  @@index([dealId])
+  @@index([assetId])
+  @@index([driverId])
+  @@index([statusId])
+  @@index([plannedDepartureAt])
+}
+
+model AssignmentLeg {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  sequence     Int
+
+  fromLocationId String?
+  toLocationId   String?
+  plannedAt      DateTime?
+  arrivedAt      DateTime?
+  distanceKm     Int?
+  notes          String?
+
+  @@unique([assignmentId, sequence])
+}
+
+// Persisted per-check gate result, so a blocked trip shows exactly WHY and an
+// override is auditable against the specific failures it bypassed.
+model AssignmentGateCheck {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  code      String // DRIVER_LICENCE, ASSET_COF, FATIGUE_DAILY, MASS_LIMIT…
+  label     String
+  passed    Boolean
+  detail    String? // human-readable reason when failed
+  checkedAt DateTime @default(now())
+
+  @@index([assignmentId])
+}
+
+// ─────────────── Load management (RTMS element 5) ───────────────
+
+model TripMassRecord {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assetId      String
+  asset        Asset      @relation(fields: [assetId], references: [id])
+
+  measuredAt       DateTime @default(now())
+  massLoadedKg     Int
+  permissibleMaxKg Int // snapshot of Asset.maxMassKg at weigh time
+  overloaded       Boolean // derived: massLoadedKg > permissibleMaxKg
+  overloadPct      Decimal? @db.Decimal(6, 2)
+
+  weighbridgeRef String?
+  documentFileId String? // FleetFile.id — weighbridge certificate
+  notes          String?
+
+  @@index([assetId, measuredAt])
+  @@index([measuredAt]) // powers the monthly overloading % rollup
+}
+
+// ─────────────── Driver wellness / fatigue (RTMS element 4) ───────────────
+// Feeds the gate's three fatigue rules: max 15h/day, 90h per rolling 7 days,
+// 30-min break each 4h of driving.
+
+model DriverDutyRecord {
+  id       String @id @default(cuid())
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id])
+
+  assignmentId String?
+
+  onDutyAt        DateTime
+  offDutyAt       DateTime?
+  drivingMinutes  Int      @default(0)
+  breakMinutes    Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([driverId, onDutyAt])
+}
+
+// ─────────────── Incident management (RTMS element 7) ───────────────
+
+model Incident {
+  id         String   @id @default(cuid())
+  reference  String   @unique // INC-2026-0001
+  occurredAt DateTime
+
+  assetId      String?
+  asset        Asset?      @relation(fields: [assetId], references: [id])
+  driverId     String?
+  driver       Driver?     @relation(fields: [driverId], references: [id])
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+
+  categoryId String?
+  category   IncidentCategory? @relation(fields: [categoryId], references: [id])
+  statusId   String
+  status     IncidentStatus    @relation(fields: [statusId], references: [id])
+
+  locationText String?
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+  description  String
+
+  // Root cause, three layers — RTMS requires more than "driver error"
+  immediateCause  String?
+  underlyingCause String?
+  systemicCause   String?
+
+  injuries          Int      @default(0)
+  vehicleDamage     Boolean  @default(false)
+  thirdPartyInvolved Boolean @default(false)
+  estimatedCost     Decimal? @db.Decimal(12, 2)
+  currency          String   @default("ZAR") @db.Char(3)
+
+  reportedById String? // User.id
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  photos  IncidentPhoto[]
+  actions CorrectiveAction[]
+
+  @@index([occurredAt])
+  @@index([assetId])
+  @@index([driverId])
+  @@index([statusId])
+}
+
+model IncidentPhoto {
+  id         String   @id @default(cuid())
+  incidentId String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  fileId     String // FleetFile.id
+  caption    String?
+  createdAt  DateTime @default(now())
+
+  @@index([incidentId])
+}
+
+model CorrectiveAction {
+  id         String   @id @default(cuid())
+  incidentId String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  description String
+  ownerUserId String? // User.id — who must do it
+  dueDate     DateTime?
+  status      CorrectiveActionStatus @default(OPEN)
+  completedAt DateTime?
+  verifiedById String? // User.id
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([incidentId])
+  @@index([status])
+}
+
+// Traffic-fine register (report R10).
+model Fine {
+  id           String  @id @default(cuid())
+  noticeNumber String?
+  issuedOn     DateTime
+
+  assetId      String?
+  asset        Asset?      @relation(fields: [assetId], references: [id])
+  driverId     String?
+  driver       Driver?     @relation(fields: [driverId], references: [id])
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+
+  reason           String
+  amount           Decimal    @db.Decimal(12, 2)
+  currency         String     @default("ZAR") @db.Char(3)
+  dueDate          DateTime?
+  paidOn           DateTime?
+  status           FineStatus @default(UNPAID)
+  correctiveAction String? // what was done with the driver
+  documentFileId   String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([assetId])
+  @@index([driverId])
+  @@index([issuedOn])
+}
+
+// Speed register (report R7) — telematics feed or manual capture.
+model SpeedEvent {
+  id           String      @id @default(cuid())
+  assetId      String
+  asset        Asset       @relation(fields: [assetId], references: [id])
+  driverId     String?
+  driver       Driver?     @relation(fields: [driverId], references: [id])
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+
+  occurredAt   DateTime
+  speedKph     Int
+  limitKph     Int
+  overByKph    Int // derived
+  locationText String?
+  source       String? @default("manual")
+  actionTaken  String?
+  createdAt    DateTime @default(now())
+
+  @@index([assetId, occurredAt])
+  @@index([driverId])
+}
+
+// ─────────── Management commitment (element 1) & review (element 8) ───────────
+
+// Versioned: a new version is a new row, the old one gets supersededAt.
+model Policy {
+  id          String   @id @default(cuid())
+  code        String // SAFETY_POLICY, SUBSTANCE_POLICY, FATIGUE_POLICY…
+  title       String
+  body        String
+  version     Int      @default(1)
+  effectiveFrom DateTime
+  supersededAt  DateTime?
+  approvedById  String? // User.id
+  rtmsElement   RtmsElement?
+  documentFileId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  acknowledgements PolicyAcknowledgement[]
+
+  @@unique([code, version])
+}
+
+model PolicyAcknowledgement {
+  id       String  @id @default(cuid())
+  policyId String
+  policy   Policy  @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+  userId   String? // User.id, for office staff
+
+  acknowledgedAt  DateTime @default(now())
+  signatureFileId String?
+
+  @@index([policyId])
+  @@index([driverId])
+}
+
+// Safety objectives & targets — the measurable half of element 1.
+model SafetyObjective {
+  id          String   @id @default(cuid())
+  title       String
+  metric      String // OVERLOADING_PCT, INCIDENT_RATE, COMPLIANCE_PCT…
+  targetValue Decimal  @db.Decimal(12, 2)
+  unit        String?
+  periodStart DateTime
+  periodEnd   DateTime
+  actualValue Decimal? @db.Decimal(12, 2) // recomputed by the monthly rollup
+  rtmsElement RtmsElement?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([periodStart])
+}
+
+// Auto monthly management review / safety performance report (element 8).
+model ManagementReview {
+  id          String   @id @default(cuid())
+  periodMonth String   @unique // YYYY-MM
+  generatedAt DateTime @default(now())
+  metrics     Json // snapshot: RAG counts, overloading %, incidents, fines, service adherence
+  notes       String?
+  reviewedById String? // User.id
+  reviewedAt   DateTime?
+  documentFileId String? // FleetFile.id of the rendered PDF
+
+  @@index([periodMonth])
+}
+
+// One "Export audit pack" action → the RTMS report set as PDFs.
+model AuditPack {
+  id          String          @id @default(cuid())
+  requestedAt DateTime        @default(now())
+  requestedById String? // User.id
+  periodStart DateTime
+  periodEnd   DateTime
+  status      AuditPackStatus @default(PENDING)
+  reports     Json? // which R-reports were included, and their file ids
+  fileId      String? // FleetFile.id of the combined pack
+  error       String?
+  completedAt DateTime?
+
+  @@index([status])
+}
+
+// ─────────────────────────── Append-only trail ───────────────────────────
+// Same discipline as TimelineEvent (never updated, never deleted), but
+// polymorphic — TimelineEvent itself is FK'd to a required dealId, so it
+// cannot carry asset/driver/incident history.
+
+model FleetEvent {
+  id         String          @id @default(cuid())
+  entityType FleetEntityType
+  entityId   String
+  type       FleetEventType
+
+  note        String?
+  meta        Json? // { workOrderId, gateChecks, previousStatus, … }
+  createdById String? // User.id
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
 }
