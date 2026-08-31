@@ -7,11 +7,14 @@ import { AccountingModule } from './accounting/accounting.module';
 import { AuthModule } from './auth/auth.module';
 import { ClamAvModule } from './clamav/clamav.module';
 import { ClientsModule } from './clients/clients.module';
+import { ComplianceModule } from './compliance/compliance.module';
 import { DealsModule } from './deals/deals.module';
+import { FleetModule } from './fleet/fleet.module';
 import { HealthController } from './health/health.controller';
 import { ImportModule } from './import/import.module';
 import { MediaModule } from './media/media.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PdfModule } from './pdf/pdf.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferenceModule } from './reference/reference.module';
 import { ReportsModule } from './reports/reports.module';
@@ -45,6 +48,10 @@ import { TrackingModule } from './tracking/tracking.module';
     NotificationsModule,
     AccountingModule,
     ReportsModule,
+    // RTMS Fleet & Compliance module
+    PdfModule,
+    FleetModule,
+    ComplianceModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
