@@ -1,8 +1,11 @@
-# POD — production stack.
-#   cp .env.production.example .env   → fill in secrets
+# POD — production stack. Self-contained: Caddy terminates TLS and is the
+# only service that publishes ports, so a fresh droplet needs nothing but
+# Docker and this file.
+#
+#   cp .env.production.example .env   → fill in every value
 #   docker compose -f docker-compose.prod.yml up -d --build
-# Put a reverse proxy (Caddy/nginx/Traefik) with TLS in front of web:3000
-# and api:4000, or expose only web and route /api through it.
+#
+# See DEPLOY.md for the DigitalOcean walkthrough.
 name: pod-prod
 
 services:
@@ -55,11 +58,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
     volumes:
       - miniodata:/data
-    ports:
-      # S3 API only, bound to loopback: a reverse proxy or tunnel on this
-      # machine publishes it as S3_PUBLIC_ENDPOINT. The :9001 console is
-      # deliberately NOT published.
-      - "127.0.0.1:9000:9000"
+    # No published ports. Caddy proxies the S3 API at minio:9000 over the
+    # compose network; the :9001 admin console is reachable from nowhere.
 
   meilisearch:
     image: getmeili/meilisearch:v1.12
@@ -100,12 +100,12 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?set in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
-      WEB_ORIGIN: ${WEB_ORIGIN:?set in .env}
+      WEB_ORIGIN: ${PUBLIC_SCHEME:-https}://${WEB_HOSTNAME:?set in .env}
       # MinIO / S3
       S3_ENDPOINT: http://minio:9000
       # Where the BROWSER reaches MinIO. Download links are signed against
       # this, so it must be publicly resolvable — see DEPLOY.md.
-      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?set in .env}
+      S3_PUBLIC_ENDPOINT: ${PUBLIC_SCHEME:-https}://${FILES_HOSTNAME:?set in .env}
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       S3_BUCKET_MEDIA: ${S3_BUCKET_MEDIA:-pod-media}
@@ -134,23 +134,72 @@ services:
       # Ops tuning
       STALLED_DAYS: ${STALLED_DAYS:-7}
       FX_RATES_USD: ${FX_RATES_USD:-{"USD":1}}
-    ports:
-      - "4000:4000"
+    # No published ports — reached as api:4000 through Caddy.
 
   web:
     build:
       context: ./apps/web
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?set in .env}
+        # Baked into the browser bundle at BUILD time — changing it later
+        # requires a rebuild, not a restart.
+        NEXT_PUBLIC_API_URL: ${PUBLIC_SCHEME:-https}://${API_HOSTNAME:?set in .env}
     restart: unless-stopped
     depends_on:
       - api
     environment:
       API_URL: http://api:4000
+    # No published ports — reached as web:3000 through Caddy.
+
+  # One-shot seeder. Postgres publishes no port, so the seed cannot be run
+  # from the host; this reaches it over the compose network instead. It is
+  # behind a profile, so it never starts with the stack:
+  #     docker compose -f docker-compose.prod.yml --profile tools run --rm seed
+  # Built from the api image's build stage because the runtime image omits
+  # devDependencies, and the seed runs through ts-node.
+  seed:
+    profiles: ["tools"]
+    build:
+      context: ./apps/api
+      target: build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pod}
+    command: ["npx", "prisma", "db", "seed"]
+
+  # The only service with published ports. Terminates TLS for all three
+  # hostnames and issues certificates on first request.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+      - minio
+    environment:
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME:-https}
+      WEB_HOSTNAME: ${WEB_HOSTNAME:?set in .env}
+      API_HOSTNAME: ${API_HOSTNAME:?set in .env}
+      FILES_HOSTNAME: ${FILES_HOSTNAME:?set in .env}
+      CADDY_EMAIL: ${CADDY_EMAIL:?set in .env}
+      # Set CADDY_CA_DIRECTIVE to "acme_ca https://acme-staging-v02.api.letsencrypt.org/directory"
+      # while testing DNS, to avoid Let's Encrypt rate limits.
+      CADDY_CA_DIRECTIVE: ${CADDY_CA_DIRECTIVE:-}
     ports:
-      - "3000:3000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing on every
+      # restart, which hits Let's Encrypt rate limits fast.
+      - caddydata:/data
+      - caddyconfig:/config
 
 volumes:
+  caddydata:
+  caddyconfig:
   pgdata:
   pgbackups:
   redisdata:

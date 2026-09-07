@@ -1,0 +1,56 @@
+# POD — TLS reverse proxy.
+#
+# Three hostnames, one certificate each, issued and renewed automatically by
+# Let's Encrypt. Nothing else on the host is reachable: the app containers
+# publish no ports at all and are reached over the compose network by service
+# name, so 80 and 443 are the only doors open on the droplet.
+#
+# PUBLIC_SCHEME is https in production. Setting it to http disables TLS, which
+# is only useful for testing this file locally against fake hostnames.
+
+{
+	email {$CADDY_EMAIL}
+	# Staging CA avoids burning Let's Encrypt rate limits while you get the
+	# DNS right. Unset CADDY_CA for real certificates.
+	{$CADDY_CA_DIRECTIVE}
+}
+
+(common) {
+	encode gzip zstd
+	header {
+		# The app is not meant to be framed or sniffed.
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+# ── Web app ──────────────────────────────────────────────────────────────
+{$PUBLIC_SCHEME}://{$WEB_HOSTNAME} {
+	import common
+	reverse_proxy web:3000
+}
+
+# ── API ──────────────────────────────────────────────────────────────────
+{$PUBLIC_SCHEME}://{$API_HOSTNAME} {
+	import common
+	# Uploads: pre-trip photos, incident photos, POD captures, paperwork.
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy api:4000
+}
+
+# ── MinIO (S3) ───────────────────────────────────────────────────────────
+# Download links are pre-signed against this hostname. A SigV4 signature
+# covers the Host header, so Caddy must pass it through unchanged — which it
+# does by default. Only the S3 API is proxied; the :9001 admin console is
+# not routed here and is not published by compose either.
+{$PUBLIC_SCHEME}://{$FILES_HOSTNAME} {
+	import common
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy minio:9000
+}

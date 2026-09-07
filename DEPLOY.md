@@ -2,95 +2,121 @@
 
 ## One-server deployment (Docker Compose)
 
+The stack is self-contained: Caddy terminates TLS and is the only service
+that publishes ports, so a fresh server needs nothing but Docker.
+
 ```bash
-cp .env.production.example .env      # fill in every CHANGE_ME value
+cp .env.production.example .env      # fill in every value
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-This starts Postgres, Redis, MinIO, Meilisearch, ClamAV, the API (port 4000)
-and the web app (port 3000). The API applies the database schema on boot.
+That starts Postgres (with nightly backups), Redis, MinIO, Meilisearch,
+ClamAV, Gotenberg, the API, the web app and Caddy. The API applies the
+database schema on boot.
 
-Put a TLS reverse proxy (Caddy is the least work) in front. **Three**
-hostnames, not two:
+### Hostnames
+
+Three DNS A records, all pointing at the server's IP:
+
+| `.env` | Serves | Proxied to |
+|---|---|---|
+| `WEB_HOSTNAME` | the web app | `web:3000` |
+| `API_HOSTNAME` | the API | `api:4000` |
+| `FILES_HOSTNAME` | file downloads | `minio:9000` |
+
+The app's public URLs are derived from those three names, so there is one
+place to set each and nothing can drift out of sync. Caddy gets a Let's
+Encrypt certificate for each on first request.
+
+`FILES_HOSTNAME` is not optional. Document, photo and audit-pack links are
+pre-signed S3 URLs, and an AWS SigV4 signature covers the host name — the
+host cannot be rewritten after signing, so the browser has to reach the same
+host the URL was signed for.
+
+**No domain?** `sslip.io` resolves `<anything>.<ip>.sslip.io` to that IP and
+Let's Encrypt will issue for it, so a bare droplet can have real HTTPS with
+nothing bought:
 
 ```
-pod.example.com       → localhost:3000   (web)
-api.pod.example.com   → localhost:4000   (api)
-files.pod.example.com → localhost:9000   (MinIO S3 — file downloads)
+WEB_HOSTNAME=pod.203.0.113.7.sslip.io
+API_HOSTNAME=api.203.0.113.7.sslip.io
+FILES_HOSTNAME=files.203.0.113.7.sslip.io
 ```
 
-`WEB_ORIGIN`, `NEXT_PUBLIC_API_URL` and `S3_PUBLIC_ENDPOINT` in `.env` must
-match those three URLs.
+## DigitalOcean
 
-The third one is not optional. Document, photo and audit-pack links are
-pre-signed S3 URLs, and an AWS SigV4 signature covers the host name — so the
-host cannot be swapped afterwards, and the browser must be able to reach the
-same host the URL was signed for. Without `S3_PUBLIC_ENDPOINT` every download
-link points at `http://minio:9000`, which only resolves inside the compose
-network. MinIO's `:9001` console is deliberately not published; only the S3
-API on `:9000` is, and only on loopback for the proxy to pick up.
+A Droplet has a static public IP, so no tunnel is needed.
 
-`NEXT_PUBLIC_API_URL` is baked into the web bundle **at image build time**,
-so change it *before* `--build`, not after.
+**Size it for ClamAV.** Measured steady state is about 2 GB — ClamAV alone
+holds ~1 GB of signatures. The $6 and $12 Droplets will not run this.
 
-## Exposing a machine that has no public IP
-
-A laptop or office machine behind NAT (or CGNAT, where inbound port
-forwarding cannot work at all) can still serve this. A tunnel gives you real
-HTTPS hostnames with no router configuration and no inbound ports open:
+| | |
+|---|---|
+| Minimum | **4 GB / 2 vCPU** (~$24/mo) |
+| Building on the box | add swap first, the Next.js build is the peak |
 
 ```bash
-brew install cloudflared
-cloudflared tunnel login
-cloudflared tunnel create pod
+# Droplet: Ubuntu LTS, 4 GB. Then, as root:
+adduser pod && usermod -aG sudo pod
+curl -fsSL https://get.docker.com | sh && usermod -aG docker pod
+
+# Swap, so the image build cannot OOM
+fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+# Firewall — only Caddy's ports. Everything else is on the compose
+# network and publishes nothing.
+ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 ```
 
-`~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: pod
-credentials-file: /Users/<you>/.cloudflared/<tunnel-id>.json
-ingress:
-  - hostname: pod.example.com
-    service: http://localhost:3000
-  - hostname: api.pod.example.com
-    service: http://localhost:4000
-  - hostname: files.pod.example.com
-    service: http://localhost:9000
-  - service: http_status:404
-```
+Then as `pod`:
 
 ```bash
-cloudflared tunnel route dns pod pod.example.com
-cloudflared tunnel route dns pod api.pod.example.com
-cloudflared tunnel route dns pod files.pod.example.com
-cloudflared tunnel run pod          # or: cloudflared service install
+git clone <repo> pod && cd pod
+cp .env.production.example .env && $EDITOR .env
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --profile tools run --rm seed
 ```
 
-Before pointing anything at the public internet:
+Point the three DNS records at the Droplet **before** the first request, so
+Caddy can complete the ACME challenge. While you are still getting DNS
+right, set `CADDY_CA_DIRECTIVE` to the Let's Encrypt staging URL (there is a
+commented line in the env file) so a mistake cannot exhaust the real rate
+limit.
 
-- Fill in **every** `CHANGE_ME` in `.env`. The dev defaults are in the repo.
-- Sign in and reset all seven seeded passwords — they are all `ChangeMe123!`
-  and the accounts are named `owner`, `admin`, `theo`, and so on.
+Low on RAM at build time? Build the two images on a laptop and push them to
+DigitalOcean's container registry instead; the Droplet then only runs them.
+
+### Before it faces the internet
+
+- Fill in **every** `CHANGE_ME`. The development defaults are in this repo.
+- Sign in and reset all seven seeded passwords — they are all
+  `ChangeMe123!` on predictable usernames (`owner`, `admin`, `theo`…).
 - Decide what should be public. Only `/track/<token>` is designed for
-  customers; the rest is staff-only and is worth putting behind an
-  identity gate (Cloudflare Access, or your proxy's basic auth).
-- The machine is now the whole system. It sleeping is an outage, and
-  `pgbackups` only covers Postgres — the `miniodata` volume holds every
+  customers; the rest is staff-only and is worth putting behind an identity
+  gate (Cloudflare Access, or `basic_auth` in the Caddyfile).
+- `pgbackups` covers Postgres only. The `miniodata` volume holds every
   uploaded document and needs its own backup.
 
 ### First run
 
-Seed the reference data and user accounts from your machine (the seed uses
-ts-node, which isn't in the production image):
+Postgres publishes no port, so the seed runs over the compose network
+rather than from your machine:
 
 ```bash
-cd apps/api
-DATABASE_URL=postgresql://…your-prod-url… npx prisma db seed
+docker compose -f docker-compose.prod.yml --profile tools run --rm seed
 ```
 
-Then sign in as `owner` / `ChangeMe123!`, go to **Team**, create real
-accounts, and reset every seeded password.
+It is idempotent — safe to re-run. Then sign in as `owner` / `ChangeMe123!`,
+go to **Team**, create real accounts, and reset every seeded password.
+
+The seed also writes placeholder RTMS expiry dates (PrDP, medical, COF,
+CBRTA, insurance) so the compliance dashboard and the assignment gate have
+something to act on during testing. They all carry a `TEST-` reference:
+
+```sql
+DELETE FROM "ComplianceItem" WHERE reference LIKE 'TEST-%';
+```
 
 ## Feature switches (work the moment credentials arrive)
 
@@ -110,3 +136,13 @@ accounts, and reset every seeded password.
   back both up. Meilisearch can be rebuilt from Postgres.
 - **Customer links** are capability URLs. They're unlisted, revocable per
   deal, and only ever expose that one car (prices only when toggled on).
+- **RTMS scheduled jobs** (BullMQ, so they need Redis up):
+  05:30 maintenance plans resync · 06:00 compliance expiry sweep and
+  DUE_SOON/EXPIRED reminders · 07:00 stalled deals ·
+  03:00 on the 1st, the monthly management review.
+  All are triggerable by hand: `POST /api/compliance/recompute`,
+  `/api/compliance/send-reminders`, `/api/maintenance/plans/sync`,
+  `/api/compliance/reviews`.
+- **Audit pack** rendering needs the `gotenberg` container. If it is down the
+  export fails with "PDF service is unavailable" rather than producing a
+  partial pack.
