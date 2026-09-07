@@ -139,7 +139,7 @@ function ReportIncidentDrawer({ open, onClose }: { open: boolean; onClose: () =>
 
   return (
     <Drawer
-      title="Report incident" open={open} onClose={onClose} width="100%"
+      title="Report incident" open={open} onClose={onClose} size="100%"
       styles={{ wrapper: { maxWidth: 520 } }}
       footer={
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '10px 4px' }}>

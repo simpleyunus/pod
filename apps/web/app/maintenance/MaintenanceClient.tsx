@@ -204,7 +204,7 @@ function WorkOrderDrawer({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Drawer
-      title="Raise work order" open={open} onClose={onClose} width={440}
+      title="Raise work order" open={open} onClose={onClose} size={440}
       extra={<Button type="primary" loading={create.isPending} onClick={() => form.submit()} style={{ borderRadius: 10 }}>Raise</Button>}
     >
       <Form

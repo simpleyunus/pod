@@ -199,6 +199,35 @@ const R16_DRIVER = {
   licenceExpiresOn: '2025-10-31',
 };
 
+// ── PLACEHOLDER DATES — TEST DATA, NOT FROM THE TOOLKIT ──────────────────
+// The toolkit carries no PrDP column, no medical dates, and no COF, CBRTA or
+// insurance expiries. These stand in so every path is exercisable while POD
+// is still testing: one item in each of VALID, DUE_SOON and EXPIRED, so the
+// RAG dashboard, the reminders engine and the assignment gate all have
+// something real to act on.
+//
+// Replace them with POD's actual certificates before the pilot. Each one is
+// written with reference "TEST-…" so they are trivial to find and clear:
+//   DELETE FROM "ComplianceItem" WHERE reference LIKE 'TEST-%';
+const PLACEHOLDER_EXPIRIES: Array<{
+  owner: 'ASSET' | 'DRIVER';
+  registrationNo?: string;
+  kind: string;
+  reference: string;
+  issuedInDays: number;
+  expiresInDays: number;
+}> = [
+  // Driver — R16 already gives a real (expired) licence, so these fill the gaps.
+  { owner: 'DRIVER', kind: 'PRDP',      reference: 'TEST-PRDP-0001',    issuedInDays: -340, expiresInDays: 25 },  // DUE_SOON
+  { owner: 'DRIVER', kind: 'MEDICAL',   reference: 'TEST-MED-0001',     issuedInDays: -215, expiresInDays: 150 }, // VALID
+  // Vehicles.
+  { owner: 'ASSET', registrationNo: 'MX87GSGP', kind: 'COF',           reference: 'TEST-COF-MX87',   issuedInDays: -350, expiresInDays: 15 },  // DUE_SOON
+  { owner: 'ASSET', registrationNo: 'MX87GSGP', kind: 'CBRTA_PERMIT',  reference: 'TEST-CBRTA-MX87', issuedInDays: -100, expiresInDays: -8 },  // EXPIRED
+  { owner: 'ASSET', registrationNo: 'MX87GSGP', kind: 'INSURANCE',     reference: 'TEST-INS-MX87',   issuedInDays: -60,  expiresInDays: 300 }, // VALID
+  { owner: 'ASSET', registrationNo: 'MY18SDGP', kind: 'COF',           reference: 'TEST-COF-MY18',   issuedInDays: -200, expiresInDays: 210 }, // VALID
+  { owner: 'ASSET', registrationNo: 'MY18SDGP', kind: 'INSURANCE',     reference: 'TEST-INS-MY18',   issuedInDays: -60,  expiresInDays: 300 }, // VALID
+];
+
 // R5 Risk Assessment ships pre-populated with POD's eight standard hazards.
 const R5_HAZARDS: Array<{ hazardIdentified: string; impact: string }> = [
   { hazardIdentified: 'Vehicles overloaded', impact: 'Vehicle does not brake as expected, thus will not be able to stop timeously in an emergency. Vehicle damaged due to excessive strain on engine and components' },
@@ -365,9 +394,20 @@ export async function seedRtms(prisma: PrismaClient) {
     create: driverFields,
   });
   await addItem({ driverId: driver.id }, 'DRIVER_LICENCE', licenceNumber, d(licenceIssuedOn), d(licenceExpiresOn));
-  // R15 has no data yet and the toolkit carries no PrDP column, so these are
-  // left uncaptured rather than invented. The gate reports them as missing,
-  // which is the honest position until POD supplies them.
+
+  // Placeholder expiries so the module is fully exercisable during testing.
+  let placeholders = 0;
+  for (const ph of PLACEHOLDER_EXPIRIES) {
+    const owner =
+      ph.owner === 'DRIVER'
+        ? { driverId: driver.id }
+        : ph.registrationNo && assetByReg[ph.registrationNo]
+          ? { assetId: assetByReg[ph.registrationNo] }
+          : null;
+    if (!owner) continue;
+    await addItem(owner, ph.kind, ph.reference, daysFromNow(ph.issuedInDays), daysFromNow(ph.expiresInDays));
+    placeholders++;
+  }
 
   // ── R3 Trip Mass Record: the two trips already on the form ───────────
   const plannedStatus = await prisma.tripStatus.findUnique({ where: { code: 'DELIVERED' } });
@@ -434,5 +474,7 @@ export async function seedRtms(prisma: PrismaClient) {
   console.log('Seeded RTMS from POD toolkit (R1, R2, R3, R5, R16, P1-P6, M1):', counts);
   if (staleDeactivated) console.log(`  Deactivated ${staleDeactivated} lookup row(s) not present in the toolkit.`);
   console.log('  Pre-trip checklist items are DERIVED from P5/P4 + NRTA minimums — R14 is not in the toolkit folder.');
-  console.log('  R15 medical and PrDP expiry dates are not in the toolkit; the gate will report them missing.');
+  console.log(`  ⚠ ${placeholders} PLACEHOLDER expiry dates seeded (PrDP, medical, COF, CBRTA, insurance).`);
+  console.log("    These are TEST DATA, not from the toolkit. Clear them with:");
+  console.log("    DELETE FROM \"ComplianceItem\" WHERE reference LIKE 'TEST-%';");
 }

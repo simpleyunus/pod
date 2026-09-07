@@ -745,7 +745,7 @@ export default function DealDetailPage() {
         </Form>
       </Modal>
 
-      <Drawer title="Record Payment" open={paymentDrawer} onClose={() => setPaymentDrawer(false)} width={360}
+      <Drawer title="Record Payment" open={paymentDrawer} onClose={() => setPaymentDrawer(false)} size={360}
         extra={<Button type="primary" loading={addPayment.isPending} onClick={() => paymentForm.submit()}>Save</Button>}>
         <Form form={paymentForm} layout="vertical" onFinish={handleAddPayment}>
           <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
@@ -797,7 +797,7 @@ export default function DealDetailPage() {
         </Form>
       </Modal>
 
-      <Drawer title="Edit deal" open={editDrawer} onClose={() => setEditDrawer(false)} width={440}
+      <Drawer title="Edit deal" open={editDrawer} onClose={() => setEditDrawer(false)} size={440}
         extra={<Button type="primary" loading={updateDeal.isPending} onClick={() => editForm.submit()}>Save</Button>}>
         <Form form={editForm} layout="vertical" onFinish={handleEditDeal}>
           <Row gutter={10}>

@@ -18,5 +18,10 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node"
   },
-  "include": ["src/**/*", "prisma/**/*.ts"]
+  // Only src is compiled. Including prisma/**/*.ts pushed the inferred root
+  // up to the project directory, so nest build emitted dist/src/main.js while
+  // package.json and the Dockerfile both start dist/main.js — the production
+  // image could not boot. prisma/seed.ts still typechecks and runs through
+  // ts-node, which compiles its entry file directly.
+  "include": ["src/**/*"]
 }

@@ -95,7 +95,7 @@ export default function AssetsClient() {
         title="Add vehicle"
         open={open}
         onClose={() => setOpen(false)}
-        width={460}
+        size={460}
         extra={
           <Button
             type="primary"

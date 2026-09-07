@@ -125,7 +125,7 @@ export default function GlobalSearch() {
         }}
         style={{ width: '100%', maxWidth: 480 }}
         popupMatchSelectWidth={480}
-        popupClassName="pod-gsearch-pop"
+        classNames={{ popup: { root: 'pod-gsearch-pop' } }}
         notFoundContent={
           value.trim() && !busy
             ? <div style={{ padding: '10px 6px', fontSize: 12, color: '#98A0AC', textAlign: 'center' }}>No cars match “{value}”</div>

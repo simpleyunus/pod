@@ -101,7 +101,7 @@ export default function AddCarDrawer({ open, onClose }: { open: boolean; onClose
       title="Add a car"
       open={open}
       onClose={onClose}
-      width={480}
+      size={480}
       extra={
         <Button type="primary" loading={createCar.isPending} onClick={() => form.submit()}>
           Create

@@ -315,7 +315,7 @@ function CreateTripDrawer({ open, onClose }: { open: boolean; onClose: () => voi
 
   return (
     <Drawer
-      title="Plan trip" open={open} onClose={onClose} width={460}
+      title="Plan trip" open={open} onClose={onClose} size={460}
       extra={<Button type="primary" loading={create.isPending} onClick={() => form.submit()} style={{ borderRadius: 10 }}>Plan</Button>}
     >
       <Form

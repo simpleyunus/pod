@@ -344,7 +344,7 @@ export default function ImportPage() {
         title="Edit Row"
         open={!!resolveDrawer}
         onClose={() => setResolveDrawer(null)}
-        width={420}
+        size={420}
         extra={
           <Button type="primary" loading={resolveRow.isPending} onClick={() => resolveForm.submit()}>
             Save & Mark Resolved

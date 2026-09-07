@@ -128,7 +128,7 @@ export default function PodCapture({
       title={`Proof of delivery — ${trip?.reference ?? ''}`}
       open={open}
       onClose={onClose}
-      width="100%"
+      size="100%"
       styles={{ wrapper: { maxWidth: 520 } }}
       footer={
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '10px 4px' }}>

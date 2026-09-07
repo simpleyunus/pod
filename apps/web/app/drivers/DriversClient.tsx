@@ -76,7 +76,7 @@ export default function DriversClient() {
       </Card>
 
       <Drawer
-        title="Add driver" open={open} onClose={() => setOpen(false)} width={420}
+        title="Add driver" open={open} onClose={() => setOpen(false)} size={420}
         extra={<Button type="primary" loading={create.isPending} onClick={() => form.submit()} style={{ borderRadius: 10 }}>Save</Button>}
       >
         <Form

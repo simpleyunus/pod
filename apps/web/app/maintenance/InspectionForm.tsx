@@ -118,7 +118,7 @@ export default function InspectionForm({
       title="Pre-trip inspection"
       open={open}
       onClose={onClose}
-      width="100%"
+      size="100%"
       styles={{ wrapper: { maxWidth: 560 }, body: { padding: '16px 18px 90px' } }}
       footer={
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 4px' }}>
