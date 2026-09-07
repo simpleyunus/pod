@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ComplianceStatus, Prisma, RtmsElement } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FleetEventsService } from '../fleet/fleet-events.service';
+import { driverName } from '../fleet/naming';
 import { WHATSAPP_PROVIDER, WhatsAppProvider } from '../notifications/whatsapp.provider';
 import { DAY_MS, Rag, daysUntil, deriveStatus, ragOf, worstOf, worstRag } from './compliance.engine';
 import { FatigueService } from './fatigue.service';
@@ -63,8 +64,8 @@ export class ComplianceService {
       where,
       include: {
         kind: true,
-        asset: { select: { id: true, code: true, registrationNo: true } },
-        driver: { select: { id: true, code: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
+        driver: { select: { id: true, employeeNo: true, surname: true, firstName: true } },
       },
       orderBy: [{ status: 'desc' }, { expiresOn: 'asc' }],
     });
@@ -227,8 +228,8 @@ export class ComplianceService {
       where: { archivedAt: null, status: { in: ['DUE_SOON', 'EXPIRED'] } },
       include: {
         kind: true,
-        asset: { select: { code: true, registrationNo: true } },
-        driver: { select: { fullName: true, phoneE164: true } },
+        asset: { select: { fleetNo: true, registrationNo: true } },
+        driver: { select: { surname: true, firstName: true, phoneE164: true } },
       },
       orderBy: { expiresOn: 'asc' },
     });
@@ -245,8 +246,10 @@ export class ComplianceService {
       if (already) { skipped++; continue; }
 
       const subject = item.asset
-        ? `${item.asset.code} (${item.asset.registrationNo})`
-        : item.driver?.fullName ?? 'Unknown';
+        ? `${item.asset.fleetNo} (${item.asset.registrationNo})`
+        : item.driver
+          ? driverName(item.driver)
+          : 'Unknown';
       const days = daysUntil(item.expiresOn, now);
       const when =
         item.status === 'EXPIRED'
@@ -302,10 +305,12 @@ export class ComplianceService {
       this.prisma.workOrder.findMany({ where: { status: { isTerminal: false } }, include: { status: true } }),
       this.prisma.maintenancePlan.findMany({ where: { active: true }, include: { asset: true } }),
       this.prisma.asset.count({ where: { active: true } }),
-      this.prisma.tripMassRecord.findMany({ where: { measuredAt: { gte: monthStart } } }),
+      this.prisma.tripMassRecord.findMany({ where: { date: { gte: monthStart } } }),
       this.prisma.incident.findMany({ where: { status: { isTerminal: false } } }),
       this.prisma.correctiveAction.findMany({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
-      this.prisma.fine.count({ where: { status: 'UNPAID' } }),
+      // R10 has no payment column; the dashboard counts fines with no
+      // corrective action recorded, which is the RTMS-relevant gap.
+      this.prisma.fine.count({ where: { correctiveActionsTaken: null } }),
       this.prisma.managementReview.findFirst({ orderBy: { periodMonth: 'desc' } }),
       this.prisma.assignment.findMany({
         where: { routeRiskAssessmentId: { not: null }, status: { isTerminal: false } },

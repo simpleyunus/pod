@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FatigueService } from '../compliance/fatigue.service';
+import { driverName } from '../fleet/naming';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface GateCheck {
@@ -7,6 +8,8 @@ export interface GateCheck {
   label: string;
   passed: boolean;
   detail?: string;
+  /** Passed, but worth the operator's attention (P2 night-driving guidance). */
+  advisory?: boolean;
 }
 
 export interface GateResult {
@@ -39,7 +42,7 @@ export class GateService {
         asset: true,
         driver: true,
         route: true,
-        massRecords: { orderBy: { measuredAt: 'desc' }, take: 1 },
+        massRecords: { orderBy: { date: 'desc' }, take: 1 },
         inspection: { include: { results: { include: { item: true } } } },
       },
     });
@@ -70,8 +73,8 @@ export class GateService {
     });
 
     for (const scope of [
-      { owner: 'DRIVER' as const, items: driverItems, subject: assignment.driver.fullName },
-      { owner: 'ASSET' as const, items: assetItems, subject: `${assignment.asset.code} (${assignment.asset.registrationNo})` },
+      { owner: 'DRIVER' as const, items: driverItems, subject: driverName(assignment.driver) },
+      { owner: 'ASSET' as const, items: assetItems, subject: `${assignment.asset.fleetNo} (${assignment.asset.registrationNo})` },
     ]) {
       for (const kind of requiredKinds.filter((k) => k.ownerType === scope.owner)) {
         const item = scope.items.find((i) => i.kindId === kind.id);
@@ -104,7 +107,7 @@ export class GateService {
     const fatigue = await this.fatigue.check(assignment.driverId);
     checks.push({
       code: 'FATIGUE',
-      label: `Driver hours — ${assignment.driver.fullName}`,
+      label: `Driver hours — ${driverName(assignment.driver)}`,
       passed: fatigue.ok,
       detail: fatigue.ok
         ? `${(fatigue.dailyMinutes / 60).toFixed(1)}h/24h, ${(fatigue.weeklyMinutes / 60).toFixed(1)}h/7d`
@@ -121,7 +124,7 @@ export class GateService {
         detail: 'Not yet weighed — record a mass before departure',
       });
     } else {
-      const max = assignment.asset.maxMassKg;
+      const max = assignment.asset.maxLoadingMassKg;
       checks.push({
         code: 'MASS_LIMIT',
         label: 'Load within permissible maximum',
@@ -155,7 +158,7 @@ export class GateService {
     // ── 6. Pre-trip inspection (element 3) ──────────────────────────────
     if (assignment.inspection) {
       const criticalFails = assignment.inspection.results.filter(
-        (r) => r.outcome === 'FAIL' && r.item.critical,
+        (r) => r.answer === 'NO' && r.item.critical,
       );
       checks.push({
         code: 'PRE_TRIP',
@@ -173,6 +176,25 @@ export class GateService {
         label: 'Pre-trip inspection',
         passed: false,
         detail: 'No pre-trip inspection recorded for this trip',
+      });
+    }
+
+    // ── 7. Night driving (P2) ───────────────────────────────────────────
+    // P2: "Driving between 23h:00 and 04:00 should be avoided". The policy
+    // says avoid, not forbid, so this warns on the trip rather than blocking
+    // it — a hard block would be stricter than POD's own policy.
+    const departure = assignment.plannedDepartureAt ?? assignment.actualDepartureAt;
+    if (departure) {
+      const hour = departure.getHours();
+      const inNightWindow = hour >= 23 || hour < 4;
+      checks.push({
+        code: 'NIGHT_DRIVING',
+        label: 'Departure outside the 23:00–04:00 window',
+        passed: true, // advisory: P2 says "should be avoided"
+        detail: inNightWindow
+          ? `Departure at ${String(hour).padStart(2, '0')}:00 falls in the window P2 says to avoid — record the reason`
+          : undefined,
+        advisory: inNightWindow,
       });
     }
 

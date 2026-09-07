@@ -99,9 +99,9 @@ export class GovernanceService {
       where: { active: true },
       orderBy: { name: 'asc' },
       include: {
-        riskAssessment: { include: { hazards: true } },
+        // R6 is a standalone briefing sheet in the toolkit, not a child of R5.
         acknowledgements: {
-          include: { driver: { select: { id: true, fullName: true } } },
+          include: { driver: { select: { id: true, surname: true, firstName: true } } },
           orderBy: { acknowledgedAt: 'desc' },
         },
       },

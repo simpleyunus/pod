@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Role } from '@prisma/client';
 import { FleetEventsService } from '../fleet/fleet-events.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { driverName } from '../fleet/naming';
 import { GateService } from './gate.service';
 
 @Injectable()
@@ -31,13 +32,13 @@ export class OperationsService {
       },
       include: {
         status: true,
-        asset: { select: { id: true, code: true, registrationNo: true, maxMassKg: true } },
-        driver: { select: { id: true, code: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true, maxLoadingMassKg: true } },
+        driver: { select: { id: true, employeeNo: true, surname: true, firstName: true } },
         carrier: { select: { id: true, name: true } },
         route: { select: { id: true, name: true, version: true } },
         deal: { select: { id: true, reference: true, make: true, model: true } },
         gateChecks: true,
-        massRecords: { orderBy: { measuredAt: 'desc' }, take: 1 },
+        massRecords: { orderBy: { date: 'desc' }, take: 1 },
       },
       orderBy: [{ plannedDepartureAt: 'asc' }, { createdAt: 'desc' }],
     });
@@ -60,7 +61,7 @@ export class OperationsService {
         deal: { select: { id: true, reference: true, make: true, model: true, client: { select: { fullName: true } } } },
         legs: { orderBy: { sequence: 'asc' } },
         gateChecks: { orderBy: { code: 'asc' } },
-        massRecords: { orderBy: { measuredAt: 'desc' } },
+        massRecords: { orderBy: { date: 'desc' } },
         inspection: { include: { results: { include: { item: true } } } },
         incidents: true,
         fines: true,
@@ -248,6 +249,11 @@ export class OperationsService {
 
   // ── Mass records (element 5) ─────────────────────────────────────────
 
+  /**
+   * R3 Trip Mass Record. The form has one column, "Mass Loaded/Passengers
+   * Loaded", so a trip is recorded against whichever limit applies to the
+   * vehicle: kilograms for freight, seats for passengers.
+   */
   async recordMass(assignmentId: string, data: any, actorId?: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
@@ -255,38 +261,46 @@ export class OperationsService {
     });
     if (!assignment) throw new NotFoundException(`Trip ${assignmentId} not found`);
 
-    const permissibleMaxKg = assignment.asset.maxMassKg;
-    const overloaded = data.massLoadedKg > permissibleMaxKg;
-    const overloadPct = overloaded
-      ? Number((((data.massLoadedKg - permissibleMaxKg) / permissibleMaxKg) * 100).toFixed(2))
-      : 0;
+    // Snapshot both limits: the register must show what the limit WAS, even
+    // if the vehicle is re-rated later.
+    const permissibleMaxKg = assignment.asset.maxLoadingMassKg;
+    const permissiblePassengers = assignment.asset.maxPassengers;
+
+    const massOver =
+      data.massLoadedKg != null && data.massLoadedKg > permissibleMaxKg;
+    const passengersOver =
+      data.passengersLoaded != null &&
+      permissiblePassengers != null &&
+      data.passengersLoaded > permissiblePassengers;
+    const overloaded = massOver || passengersOver; // R3 "Overloaded (Yes/No)"
 
     const record = await this.prisma.tripMassRecord.create({
       data: {
         assignmentId,
         assetId: assignment.assetId,
-        measuredAt: data.measuredAt ?? new Date(),
-        massLoadedKg: data.massLoadedKg,
-        // Snapshot the limit: the report must show what the limit WAS, even
-        // if the vehicle is re-rated later.
+        date: data.date ?? new Date(),
+        massLoadedKg: data.massLoadedKg ?? null,
+        passengersLoaded: data.passengersLoaded ?? null,
         permissibleMaxKg,
+        permissiblePassengers,
         overloaded,
-        overloadPct,
-        weighbridgeRef: data.weighbridgeRef,
         documentFileId: data.documentFileId,
-        notes: data.notes,
+        comments: data.comments,
       },
     });
 
+    const loadText =
+      data.massLoadedKg != null
+        ? `${data.massLoadedKg.toLocaleString()} kg of ${permissibleMaxKg.toLocaleString()} kg`
+        : `${data.passengersLoaded} of ${permissiblePassengers ?? '—'} passengers`;
+
     await this.events.record(
       'ASSIGNMENT', assignmentId, overloaded ? 'STATUS_CHANGE' : 'NOTE',
-      overloaded
-        ? `OVERLOADED: ${data.massLoadedKg.toLocaleString()} kg against a ${permissibleMaxKg.toLocaleString()} kg limit (+${overloadPct}%)`
-        : `Mass recorded: ${data.massLoadedKg.toLocaleString()} kg`,
+      overloaded ? `OVERLOADED — ${loadText}` : `Load recorded: ${loadText}`,
       { massRecordId: record.id, overloaded }, actorId,
     );
 
-    // A new weight changes the load check, so the gate is re-decided.
+    // A new load changes the gate's load check, so it is re-decided.
     await this.runGate(assignmentId, actorId);
     return record;
   }
@@ -295,14 +309,14 @@ export class OperationsService {
     const now = new Date();
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
     const records = await this.prisma.tripMassRecord.findMany({
-      where: { measuredAt: { gte: start } },
-      include: { asset: { select: { code: true } }, assignment: { select: { reference: true } } },
-      orderBy: { measuredAt: 'desc' },
+      where: { date: { gte: start } },
+      include: { asset: { select: { fleetNo: true, registrationNo: true } }, assignment: { select: { reference: true } } },
+      orderBy: { date: 'desc' },
     });
 
     const byMonth = new Map<string, { total: number; overloaded: number }>();
     for (const r of records) {
-      const key = r.measuredAt.toISOString().slice(0, 7);
+      const key = r.date.toISOString().slice(0, 7);
       const b = byMonth.get(key) ?? { total: 0, overloaded: 0 };
       b.total++;
       if (r.overloaded) b.overloaded++;
@@ -339,12 +353,12 @@ export class OperationsService {
       include: {
         status: true,
         category: true,
-        asset: { select: { id: true, code: true, registrationNo: true } },
-        driver: { select: { id: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
+        driver: { select: { id: true, surname: true, firstName: true } },
         actions: true,
         photos: true,
       },
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { date: 'desc' },
     });
   }
 
@@ -451,11 +465,23 @@ export class OperationsService {
         ...(data.status === 'VERIFIED' && { verifiedById: actorId }),
       },
     });
-    await this.events.record('INCIDENT', existing.incidentId, 'CORRECTIVE_ACTION', `Action ${data.status ?? 'updated'}: ${action.description}`, { actionId: id }, actorId);
+    // R9 is shared, so the trail entry goes against whatever raised it.
+    const target = existing.incidentId
+      ? (['INCIDENT', existing.incidentId] as const)
+      : existing.driverId
+        ? (['DRIVER', existing.driverId] as const)
+        : null;
+    if (target) {
+      await this.events.record(
+        target[0], target[1], 'CORRECTIVE_ACTION',
+        `Action ${data.status ?? 'updated'}: ${action.description}`,
+        { actionId: id }, actorId,
+      );
+    }
     return action;
   }
 
-  // ── Fines (R10) and speed events (R7) ────────────────────────────────
+  // ── Fines (R10) and speed trends (R7) ────────────────────────────────
 
   listFines(filters: { assetId?: string; driverId?: string; unpaidOnly?: boolean } = {}) {
     return this.prisma.fine.findMany({
@@ -465,10 +491,10 @@ export class OperationsService {
         ...(filters.unpaidOnly && { status: 'UNPAID' }),
       },
       include: {
-        asset: { select: { id: true, code: true, registrationNo: true } },
-        driver: { select: { id: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
+        driver: { select: { id: true, surname: true, firstName: true } },
       },
-      orderBy: { issuedOn: 'desc' },
+      orderBy: { date: 'desc' },
     });
   }
 
@@ -489,25 +515,24 @@ export class OperationsService {
     return this.prisma.fine.update({ where: { id }, data });
   }
 
-  listSpeedEvents(filters: { assetId?: string; driverId?: string } = {}) {
-    return this.prisma.speedEvent.findMany({
+  listSpeedTrends(filters: { assetId?: string; driverId?: string } = {}) {
+    return this.prisma.speedTrend.findMany({
       where: {
         ...(filters.assetId && { assetId: filters.assetId }),
         ...(filters.driverId && { driverId: filters.driverId }),
       },
       include: {
-        asset: { select: { id: true, code: true } },
-        driver: { select: { id: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
+        driver: { select: { id: true, surname: true, firstName: true } },
       },
-      orderBy: { occurredAt: 'desc' },
+      orderBy: { date: 'desc' },
       take: 200,
     });
   }
 
-  createSpeedEvent(data: any) {
-    return this.prisma.speedEvent.create({
-      // overByKph is derived, never taken from the caller.
-      data: { ...data, overByKph: Math.max(0, data.speedKph - data.limitKph) },
-    });
+  // R7 records a described trend and the action taken, not a telematics
+  // reading — the form has no speed or limit column.
+  createSpeedTrend(data: any) {
+    return this.prisma.speedTrend.create({ data });
   }
 }

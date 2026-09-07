@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ComplianceStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FleetEventsService } from './fleet-events.service';
+import { driverName } from './naming';
 
 // Worst-first ordering: an asset with one EXPIRED item is red regardless of
 // how many valid ones it has.
@@ -29,18 +30,17 @@ export class FleetService {
       ...(opts.typeId && { typeId: opts.typeId }),
       ...(opts.q && {
         OR: [
-          { code: { contains: opts.q, mode: 'insensitive' } },
+          { fleetNo: { contains: opts.q, mode: 'insensitive' } },
           { registrationNo: { contains: opts.q, mode: 'insensitive' } },
           { vin: { contains: opts.q, mode: 'insensitive' } },
-          { make: { contains: opts.q, mode: 'insensitive' } },
-          { model: { contains: opts.q, mode: 'insensitive' } },
+          { makeManufacturer: { contains: opts.q, mode: 'insensitive' } },
         ],
       }),
     };
 
     const assets = await this.prisma.asset.findMany({
       where,
-      orderBy: { code: 'asc' },
+      orderBy: { fleetNo: 'asc' },
       include: {
         type: true,
         complianceItems: {
@@ -86,13 +86,13 @@ export class FleetService {
         inspections: { orderBy: { performedAt: 'desc' }, take: 20 },
         tyreRecords: { orderBy: { createdAt: 'desc' } },
         assignments: {
-          include: { status: true, driver: { select: { id: true, fullName: true } } },
+          include: { status: true, driver: { select: { id: true, surname: true, firstName: true } } },
           orderBy: { createdAt: 'desc' },
           take: 20,
         },
-        incidents: { orderBy: { occurredAt: 'desc' }, take: 20 },
-        fines: { orderBy: { issuedOn: 'desc' }, take: 20 },
-        massRecords: { orderBy: { measuredAt: 'desc' }, take: 20 },
+        incidents: { orderBy: { date: 'desc' }, take: 20 },
+        fines: { orderBy: { date: 'desc' }, take: 20 },
+        massRecords: { orderBy: { date: 'desc' }, take: 20 },
       },
     });
     if (!asset) throw new NotFoundException(`Asset ${id} not found`);
@@ -105,7 +105,7 @@ export class FleetService {
 
   async createAsset(data: any, actorId?: string) {
     const asset = await this.prisma.asset.create({ data });
-    await this.events.record('ASSET', asset.id, 'SYSTEM', `Asset ${asset.code} added to fleet`, null, actorId);
+    await this.events.record('ASSET', asset.id, 'SYSTEM', `Vehicle ${asset.fleetNo} (${asset.registrationNo}) added to the fleet list`, null, actorId);
     return asset;
   }
 
@@ -144,12 +144,13 @@ export class FleetService {
         ...(opts.includeInactive ? {} : { active: true }),
         ...(opts.q && {
           OR: [
-            { fullName: { contains: opts.q, mode: 'insensitive' } },
-            { code: { contains: opts.q, mode: 'insensitive' } },
+            { surname: { contains: opts.q, mode: 'insensitive' } },
+            { firstName: { contains: opts.q, mode: 'insensitive' } },
+            { employeeNo: { contains: opts.q, mode: 'insensitive' } },
           ],
         }),
       },
-      orderBy: { fullName: 'asc' },
+      orderBy: [{ surname: 'asc' }, { firstName: 'asc' }],
       include: {
         complianceItems: {
           where: { archivedAt: null },
@@ -185,13 +186,13 @@ export class FleetService {
           orderBy: { expiresOn: 'asc' },
         },
         assignments: {
-          include: { status: true, asset: { select: { id: true, code: true, registrationNo: true } } },
+          include: { status: true, asset: { select: { id: true, fleetNo: true, registrationNo: true } } },
           orderBy: { createdAt: 'desc' },
           take: 20,
         },
         dutyRecords: { orderBy: { onDutyAt: 'desc' }, take: 30 },
-        incidents: { orderBy: { occurredAt: 'desc' }, take: 20 },
-        fines: { orderBy: { issuedOn: 'desc' }, take: 20 },
+        incidents: { orderBy: { date: 'desc' }, take: 20 },
+        fines: { orderBy: { date: 'desc' }, take: 20 },
         routeAcks: { include: { route: { select: { id: true, name: true, version: true } } } },
         policyAcks: { include: { policy: { select: { id: true, code: true, title: true, version: true } } } },
       },
@@ -204,7 +205,7 @@ export class FleetService {
 
   async createDriver(data: any, actorId?: string) {
     const driver = await this.prisma.driver.create({ data });
-    await this.events.record('DRIVER', driver.id, 'SYSTEM', `Driver ${driver.fullName} added`, null, actorId);
+    await this.events.record('DRIVER', driver.id, 'SYSTEM', `Driver ${driverName(driver)} added`, null, actorId);
     return driver;
   }
 
@@ -230,7 +231,7 @@ export class FleetService {
       where: { id },
       include: {
         assignments: {
-          include: { status: true, asset: { select: { code: true } } },
+          include: { status: true, asset: { select: { fleetNo: true, registrationNo: true } } },
           orderBy: { createdAt: 'desc' },
           take: 20,
         },
@@ -256,7 +257,7 @@ export class FleetService {
     return this.prisma.tyreRecord.findMany({
       where: assetId ? { assetId } : {},
       orderBy: [{ assetId: 'asc' }, { createdAt: 'desc' }],
-      include: { asset: { select: { id: true, code: true, registrationNo: true } } },
+      include: { asset: { select: { id: true, fleetNo: true, registrationNo: true } } },
     });
   }
 

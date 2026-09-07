@@ -18,51 +18,83 @@ export class MonthlyReviewService {
     return d.toISOString().slice(0, 7);
   }
 
+  /**
+   * R17 Safety Performance Report. The manual (4.15) lists exactly what is
+   * monitored, and R17's columns are those six counts — so this returns them
+   * under those names, and the register prints them straight out.
+   *
+   *   Number of accidents/incidents · Number of Speed violations ·
+   *   Number of traffic fines · Number of excessive hours (shift/driving) ·
+   *   Number of service overruns · Number of overloads
+   */
   async metricsFor(periodMonth: string) {
     const [y, m] = periodMonth.split('-').map(Number);
     const start = new Date(Date.UTC(y, m - 1, 1));
     const end = new Date(Date.UTC(y, m, 1));
     const range = { gte: start, lt: end };
 
-    const [mass, incidents, fines, workOrders, inspections, trips, speedEvents, items] =
+    const [mass, incidents, fines, speedTrends, workOrders, inspections, trips, plans, duty, items] =
       await Promise.all([
-        this.prisma.tripMassRecord.findMany({ where: { measuredAt: range } }),
-        this.prisma.incident.findMany({ where: { occurredAt: range }, include: { actions: true } }),
-        this.prisma.fine.findMany({ where: { issuedOn: range } }),
+        this.prisma.tripMassRecord.findMany({ where: { date: range } }),
+        this.prisma.incident.findMany({ where: { date: range }, include: { actions: true } }),
+        this.prisma.fine.findMany({ where: { date: range } }),
+        this.prisma.speedTrend.findMany({ where: { date: range } }),
         this.prisma.workOrder.findMany({ where: { requestedAt: range }, include: { status: true } }),
         this.prisma.inspection.findMany({ where: { performedAt: range } }),
         this.prisma.assignment.findMany({ where: { createdAt: range }, include: { status: true } }),
-        this.prisma.speedEvent.findMany({ where: { occurredAt: range } }),
+        this.prisma.maintenancePlan.findMany({ where: { active: true }, include: { asset: true } }),
+        this.prisma.driverDutyRecord.findMany({ where: { onDutyAt: range } }),
         this.prisma.complianceItem.findMany({ where: { archivedAt: null } }),
       ]);
 
-    const overloaded = mass.filter((r) => r.overloaded).length;
-    const maintenanceSpend = workOrders.reduce(
-      (s, w) => s + Number(w.partsCost ?? 0) + Number(w.labourCost ?? 0),
-      0,
-    );
+    // "Excessive hours (shift/driving)" — P2's limits: over 15h in a shift,
+    // or a shift that owed a 30-minute break per 4h of driving and did not
+    // record one.
+    const excessiveHours = duty.filter((d) => {
+      const end2 = d.offDutyAt ?? new Date();
+      const shiftMinutes = (end2.getTime() - d.onDutyAt.getTime()) / 60_000;
+      const owedBreaks = Math.floor(d.drivingMinutes / 240) * 30;
+      return shiftMinutes > 15 * 60 || owedBreaks > d.breakMinutes;
+    }).length;
+
+    // "Service overruns" — a plan past its due date or due kilometres.
+    const serviceOverruns = plans.filter(
+      (p2) =>
+        (p2.nextDueDate !== null && p2.nextDueDate < end) ||
+        (p2.nextDueOdoKm !== null && p2.asset.odometerKm >= p2.nextDueOdoKm),
+    ).length;
+
+    const overloads = mass.filter((r) => r.overloaded).length;
 
     return {
       periodMonth,
+      // ── The six R17 columns, in the register's order ──────────────────
+      r17: {
+        accidentsIncidents: incidents.length,
+        speedViolations: speedTrends.length,
+        trafficFines: fines.length,
+        excessiveHours,
+        serviceOverruns,
+        overloads,
+      },
+      // ── Supporting detail for the dashboard and the review record ────
       load: {
-        tripsWeighed: mass.length,
-        overloaded,
-        overloadingPct: mass.length ? Number(((overloaded / mass.length) * 100).toFixed(2)) : 0,
+        tripsRecorded: mass.length,
+        overloaded: overloads,
+        // R4 Monthly Overloading Report.
+        overloadingPct: mass.length ? Number(((overloads / mass.length) * 100).toFixed(2)) : 0,
       },
       incidents: {
         total: incidents.length,
+        nearMisses: incidents.filter((i) => i.isNearMiss).length,
         withInjuries: incidents.filter((i) => i.injuries > 0).length,
-        openCorrectiveActions: incidents.flatMap((i) => i.actions).filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length,
-      },
-      fines: {
-        count: fines.length,
-        totalAmount: fines.reduce((s, f) => s + Number(f.amount), 0),
-        unpaid: fines.filter((f) => f.status === 'UNPAID').length,
+        openCorrectiveActions: incidents
+          .flatMap((i) => i.actions)
+          .filter((a) => a.status === 'OPEN' || a.status === 'IN_PROGRESS').length,
       },
       maintenance: {
         workOrdersRaised: workOrders.length,
         workOrdersClosed: workOrders.filter((w) => w.status.isTerminal).length,
-        spend: Number(maintenanceSpend.toFixed(2)),
       },
       inspections: {
         performed: inspections.length,
@@ -73,10 +105,6 @@ export class MonthlyReviewService {
         delivered: trips.filter((t) => t.status.isTerminal).length,
         gateBlocked: trips.filter((t) => t.gateDecision === 'FAIL').length,
         gateOverridden: trips.filter((t) => t.gateDecision === 'OVERRIDDEN').length,
-      },
-      speed: {
-        events: speedEvents.length,
-        worstOverKph: speedEvents.reduce((max, e) => Math.max(max, e.overByKph), 0),
       },
       compliance: {
         total: items.length,
@@ -114,6 +142,7 @@ export class MonthlyReviewService {
     const actuals: Record<string, number> = {
       OVERLOADING_PCT: metrics.load.overloadingPct,
       FATAL_INCIDENTS: metrics.incidents.withInjuries,
+      SPEED_VIOLATIONS: metrics.r17.speedViolations,
       COMPLIANCE_PCT: metrics.compliance.total
         ? Number(((metrics.compliance.valid / metrics.compliance.total) * 100).toFixed(2))
         : 100,

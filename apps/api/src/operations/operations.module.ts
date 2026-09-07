@@ -3,7 +3,7 @@ import { ComplianceModule } from '../compliance/compliance.module';
 import { FleetModule } from '../fleet/fleet.module';
 import { GateService } from './gate.service';
 import {
-  FinesController, IncidentsController, SpeedEventsController, TripsController,
+  FinesController, IncidentsController, SpeedTrendsController, TripsController,
 } from './operations.controller';
 import { OperationsService } from './operations.service';
 
@@ -12,7 +12,7 @@ import { OperationsService } from './operations.service';
 // and the dashboard's driver-wellness tile are the same code.
 @Module({
   imports: [FleetModule, ComplianceModule],
-  controllers: [TripsController, IncidentsController, FinesController, SpeedEventsController],
+  controllers: [TripsController, IncidentsController, FinesController, SpeedTrendsController],
   providers: [OperationsService, GateService],
   exports: [OperationsService, GateService],
 })

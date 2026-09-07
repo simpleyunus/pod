@@ -73,7 +73,7 @@ export class MaintenanceService {
   listPlans(assetId?: string) {
     return this.prisma.maintenancePlan.findMany({
       where: { ...(assetId && { assetId }), active: true },
-      include: { asset: { select: { id: true, code: true, registrationNo: true, odometerKm: true } } },
+      include: { asset: { select: { id: true, fleetNo: true, registrationNo: true, odometerKm: true } } },
       orderBy: { nextDueDate: 'asc' },
     });
   }
@@ -168,7 +168,7 @@ export class MaintenanceService {
       },
       include: {
         status: true,
-        asset: { select: { id: true, code: true, registrationNo: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
         inspectionResults: { include: { item: true } },
       },
       orderBy: { requestedAt: 'desc' },
@@ -270,7 +270,7 @@ export class MaintenanceService {
       where: { id },
       include: {
         status: true,
-        asset: { select: { id: true, code: true, registrationNo: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
         inspectionResults: { include: { item: true, inspection: true } },
       },
     });
@@ -289,8 +289,8 @@ export class MaintenanceService {
         ...(filters.failedOnly && { passed: false }),
       },
       include: {
-        asset: { select: { id: true, code: true, registrationNo: true } },
-        driver: { select: { id: true, fullName: true } },
+        asset: { select: { id: true, fleetNo: true, registrationNo: true } },
+        driver: { select: { id: true, surname: true, firstName: true } },
         results: { include: { item: true } },
       },
       orderBy: { performedAt: 'desc' },
@@ -381,12 +381,12 @@ export class MaintenanceService {
       this.prisma.maintenancePlan.findMany({ where: { active: true }, include: { asset: true } }),
       this.prisma.workOrder.findMany({
         where: { status: { isTerminal: false } },
-        include: { status: true, asset: { select: { id: true, code: true, registrationNo: true } } },
+        include: { status: true, asset: { select: { id: true, fleetNo: true, registrationNo: true } } },
         orderBy: { requestedAt: 'asc' },
       }),
       this.prisma.inspection.findMany({
         where: { performedAt: { gte: new Date(now.getTime() - 30 * DAY_MS) } },
-        include: { asset: { select: { id: true, code: true } }, results: { include: { item: true } } },
+        include: { asset: { select: { id: true, fleetNo: true } }, results: { include: { item: true } } },
         orderBy: { performedAt: 'desc' },
         take: 50,
       }),
@@ -401,7 +401,7 @@ export class MaintenanceService {
       return {
         planId: p.id,
         assetId: p.assetId,
-        assetCode: p.asset.code,
+        fleetNo: p.asset.fleetNo,
         registrationNo: p.asset.registrationNo,
         name: p.name,
         odometerKm: p.asset.odometerKm,

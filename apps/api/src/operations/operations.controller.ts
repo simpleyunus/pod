@@ -4,7 +4,7 @@ import {
   AssignmentCreateSchema, AssignmentUpdateSchema, CorrectiveActionSchema,
   CorrectiveActionUpdateSchema, FineSchema, IncidentCreateSchema,
   IncidentInvestigationSchema, MassRecordSchema, PodCaptureSchema,
-  SpeedEventSchema, StartTripSchema,
+  SpeedTrendSchema, StartTripSchema,
 } from './dto';
 import { GateService } from './gate.service';
 import { OperationsService } from './operations.service';
@@ -152,18 +152,19 @@ export class FinesController {
   }
 }
 
-@Controller('speed-events')
-export class SpeedEventsController {
+// R7 Speed Trend Analysis Report.
+@Controller('speed-trends')
+export class SpeedTrendsController {
   constructor(private readonly ops: OperationsService) {}
 
   @Get()
   list(@Query('assetId') assetId?: string, @Query('driverId') driverId?: string) {
-    return this.ops.listSpeedEvents({ assetId, driverId });
+    return this.ops.listSpeedTrends({ assetId, driverId });
   }
 
   @Post()
   @MinRole('CONSULTANT')
   create(@Body() body: unknown) {
-    return this.ops.createSpeedEvent(SpeedEventSchema.parse(body));
+    return this.ops.createSpeedTrend(SpeedTrendSchema.parse(body));
   }
 }

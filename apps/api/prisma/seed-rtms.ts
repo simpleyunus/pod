@@ -8,16 +8,18 @@ import { PrismaClient, ComplianceOwnerType, RtmsElement } from '@prisma/client';
 // on a unique code, so admin edits to `name`/`sortOrder` survive a re-seed
 // while the behavioural flags stay authoritative.
 
+// R1 "Vehicle Type (e.g., truck, trailer, crane etc.)" — the form's own words.
 const ASSET_TYPES = [
-  { code: 'TRUCK_TRACTOR', name: 'Truck tractor (horse)', isTrailer: false },
-  { code: 'CAR_CARRIER',   name: 'Car carrier trailer',   isTrailer: true },
-  { code: 'RIGID_TRUCK',   name: 'Rigid truck',           isTrailer: false },
-  { code: 'BAKKIE',        name: 'Bakkie / LDV',          isTrailer: false },
-  { code: 'TRAILER',       name: 'General trailer',       isTrailer: true },
+  { code: 'TRUCK', name: 'Truck', isTrailer: false },
+  { code: 'TRAILER', name: 'Trailer', isTrailer: true },
+  { code: 'CRANE', name: 'Crane', isTrailer: false },
+  { code: 'RIGID', name: 'Rigid vehicle', isTrailer: false },
+  { code: 'LDV', name: 'Light delivery vehicle', isTrailer: false },
 ];
 
-// `requiredForOperation` is what the assignment gate actually reads — admins
-// decide what blocks a trip without anyone touching code.
+// Every kind here is traceable to a toolkit document. `requiredForOperation`
+// is what the assignment gate reads, so admins change what blocks a trip
+// without a code change.
 const COMPLIANCE_KINDS: Array<{
   code: string;
   name: string;
@@ -26,21 +28,24 @@ const COMPLIANCE_KINDS: Array<{
   requiredForOperation: boolean;
   rtmsElement: RtmsElement;
 }> = [
-  // ── Vehicle (element 3: vehicle fitness) ──
-  { code: 'VEHICLE_LICENCE', name: 'Vehicle licence disc',        ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
-  { code: 'COF',             name: 'Certificate of Fitness',      ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
-  { code: 'INSURANCE',       name: 'Vehicle insurance',           ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
-  { code: 'SERVICE_DUE',     name: 'Service due',                 ownerType: 'ASSET',  leadDaysDueSoon: 14, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
-  { code: 'OPERATOR_CARD',   name: 'Operator card',               ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
-  // ── Vehicle (element 6: journey management — cross-border) ──
-  { code: 'CBRTA_PERMIT',    name: 'CBRTA cross-border permit',   ownerType: 'ASSET',  leadDaysDueSoon: 45, requiredForOperation: true,  rtmsElement: 'JOURNEY_MANAGEMENT' },
-  // ── Driver (element 4: driver wellness) ──
-  { code: 'DRIVER_LICENCE',  name: 'Driving licence',             ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
-  { code: 'PRDP',            name: 'Professional Driving Permit', ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
-  { code: 'MEDICAL',         name: 'Medical certificate',         ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
-  { code: 'PASSPORT',        name: 'Passport',                    ownerType: 'DRIVER', leadDaysDueSoon: 60, requiredForOperation: false, rtmsElement: 'JOURNEY_MANAGEMENT' },
+  // Vehicle — R2 Licence Schedule has exactly two expiry columns.
+  { code: 'VEHICLE_LICENCE', name: 'Vehicle licence',            ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
+  { code: 'PERMIT',          name: 'Permit',                     ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
+  { code: 'COF',             name: 'Certificate of Fitness',     ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
+  { code: 'CBRTA_PERMIT',    name: 'CBRTA cross-border permit',  ownerType: 'ASSET',  leadDaysDueSoon: 45, requiredForOperation: false, rtmsElement: 'JOURNEY_MANAGEMENT' },
+  // Manual 4.12 Insurance Provision.
+  { code: 'INSURANCE',       name: 'Insurance cover',            ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
+  // R11 "Next service due".
+  { code: 'SERVICE_DUE',     name: 'Service due',                ownerType: 'ASSET',  leadDaysDueSoon: 14, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
+
+  // Driver — R16 licence schedule, manual 4.14 PrDP, R15 medical schedule.
+  { code: 'DRIVER_LICENCE',  name: 'Driving licence',            ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
+  { code: 'PRDP',            name: 'Professional Driving Permit', ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true, rtmsElement: 'DRIVER_WELLNESS' },
+  { code: 'MEDICAL',         name: 'Medical certificate',        ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
+  // Manual 4.14: defensive driver training on a bi-annual basis (module M1).
+  { code: 'TRAINING_DUE',    name: 'Driver training due',        ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'DRIVER_WELLNESS' },
+  // P6 Substance Abuse Policy acknowledgement.
   { code: 'SUBSTANCE_ACK',   name: 'Substance policy acknowledgement', ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'DRIVER_WELLNESS' },
-  { code: 'INDUCTION',       name: 'Safety induction',            ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'MANAGEMENT_COMMITMENT' },
 ];
 
 const WORK_ORDER_STATUSES = [
@@ -81,69 +86,136 @@ const INCIDENT_CATEGORIES = [
 
 // The daily pre-trip checklist. `critical: true` items block departure when
 // they fail — the gate reads this flag rather than a hardcoded list.
+// Pre-trip checklist items.
+//
+// R14 (the company's own Pre-Trip Checklist) is referenced by P5 and the
+// manual but is NOT present in the toolkit folder, so these items are
+// DERIVED from the minimum safety criteria P5 requires — National Road
+// Traffic Act roadworthiness items plus the load checks in P4. They are
+// ordinary lookup rows: when R14 turns up, an admin edits the list in the
+// UI to match it exactly, with no code change and no migration.
+//
+// `critical: true` blocks departure at the gate, per P5's rule that a
+// vehicle with a safety-compromising defect may not enter a public road.
 const INSPECTION_ITEMS = [
-  { code: 'OIL_LEVEL',     label: 'Engine oil level',            category: 'Under the bonnet', critical: false },
-  { code: 'COOLANT',       label: 'Coolant level',               category: 'Under the bonnet', critical: false },
-  { code: 'BELTS_HOSES',   label: 'Belts and hoses',             category: 'Under the bonnet', critical: false },
-  { code: 'FUEL_LEAKS',    label: 'No fuel or oil leaks',        category: 'Under the bonnet', critical: true  },
-  { code: 'TYRE_TREAD',    label: 'Tyre tread depth and wear',   category: 'Tyres and wheels', critical: true  },
-  { code: 'TYRE_PRESSURE', label: 'Tyre pressure',               category: 'Tyres and wheels', critical: false },
-  { code: 'WHEEL_NUTS',    label: 'Wheel nuts and studs',        category: 'Tyres and wheels', critical: true  },
-  { code: 'SPARE_WHEEL',   label: 'Spare wheel present',         category: 'Tyres and wheels', critical: false },
-  { code: 'SERVICE_BRAKE', label: 'Service brakes',              category: 'Brakes',           critical: true  },
-  { code: 'PARK_BRAKE',    label: 'Parking brake',               category: 'Brakes',           critical: true  },
-  { code: 'AIR_LEAKS',     label: 'Air system — no leaks',       category: 'Brakes',           critical: true  },
-  { code: 'HEADLIGHTS',    label: 'Headlights and tail lights',  category: 'Lights',           critical: true  },
-  { code: 'INDICATORS',    label: 'Indicators and hazards',      category: 'Lights',           critical: true  },
-  { code: 'BRAKE_LIGHTS',  label: 'Brake lights',                category: 'Lights',           critical: true  },
-  { code: 'REFLECTORS',    label: 'Reflective tape and chevrons', category: 'Lights',          critical: false },
-  { code: 'COUPLING',      label: 'Fifth wheel / coupling secure', category: 'Coupling and load', critical: true },
-  { code: 'LOAD_SECURING', label: 'Load properly secured',       category: 'Coupling and load', critical: true  },
-  { code: 'RAMPS',         label: 'Ramps and deck locks',        category: 'Coupling and load', critical: true  },
-  { code: 'MIRRORS',       label: 'Mirrors clean and adjusted',  category: 'Cab',              critical: false },
-  { code: 'WIPERS',        label: 'Wipers and washers',          category: 'Cab',              critical: false },
-  { code: 'HORN',          label: 'Horn working',                category: 'Cab',              critical: false },
-  { code: 'SEATBELTS',     label: 'Seatbelts',                   category: 'Cab',              critical: true  },
-  { code: 'EXTINGUISHER',  label: 'Fire extinguisher charged',   category: 'Safety equipment', critical: true  },
-  { code: 'TRIANGLES',     label: 'Warning triangles',           category: 'Safety equipment', critical: true  },
-  { code: 'FIRST_AID',     label: 'First aid kit',               category: 'Safety equipment', critical: false },
-  { code: 'LICENCE_DISC',  label: 'Licence disc displayed and valid', category: 'Documents',   critical: true  },
-  { code: 'PERMITS',       label: 'Cross-border permits on board', category: 'Documents',      critical: true  },
+  { code: 'TYRES',        label: 'Tyres — tread, condition and pressure',   category: 'Tyres and wheels', critical: true },
+  { code: 'WHEEL_NUTS',   label: 'Wheel nuts, studs and rims',              category: 'Tyres and wheels', critical: true },
+  { code: 'SPARE_WHEEL',  label: 'Spare wheel and changing equipment',      category: 'Tyres and wheels', critical: false },
+  { code: 'SERVICE_BRAKE', label: 'Service brakes',                         category: 'Brakes',           critical: true },
+  { code: 'PARK_BRAKE',   label: 'Parking brake',                           category: 'Brakes',           critical: true },
+  { code: 'AIR_SYSTEM',   label: 'Air system — pressure and no leaks',      category: 'Brakes',           critical: true },
+  { code: 'HEADLIGHTS',   label: 'Headlights, tail lights and brake lights', category: 'Lights and signals', critical: true },
+  { code: 'INDICATORS',   label: 'Indicators and hazard lights',            category: 'Lights and signals', critical: true },
+  { code: 'REFLECTORS',   label: 'Reflective tape, chevrons and reflectors', category: 'Lights and signals', critical: false },
+  { code: 'STEERING',     label: 'Steering — free play and response',       category: 'Controls',         critical: true },
+  { code: 'MIRRORS',      label: 'Mirrors — present, clean and adjusted',   category: 'Controls',         critical: true },
+  { code: 'WIPERS',       label: 'Windscreen, wipers and washers',          category: 'Controls',         critical: false },
+  { code: 'HORN',         label: 'Horn',                                    category: 'Controls',         critical: false },
+  { code: 'SEATBELTS',    label: 'Seatbelts',                               category: 'Controls',         critical: true },
+  { code: 'LEAKS',        label: 'No fuel, oil, water or air leaks',        category: 'Under the bonnet', critical: true },
+  { code: 'OIL_WATER',    label: 'Engine oil and coolant levels',           category: 'Under the bonnet', critical: false },
+  { code: 'BATTERY',      label: 'Battery secure and terminals clean',      category: 'Under the bonnet', critical: false },
+  // P4 Safe Loading & Off-loading Procedure.
+  { code: 'COUPLING',     label: 'Coupling / fifth wheel secure',           category: 'Coupling and load', critical: true },
+  { code: 'LOAD_SECURED', label: 'Load secured — straps and lashings correct', category: 'Coupling and load', critical: true },
+  { code: 'RAMPS_LOCKS',  label: 'Ramps and deck locks secure',             category: 'Coupling and load', critical: true },
+  { code: 'CHOCKS',       label: 'Wheel chocks carried',                    category: 'Coupling and load', critical: false },
+  { code: 'EXTINGUISHER', label: 'Fire extinguisher present and charged',   category: 'Safety equipment', critical: true },
+  { code: 'TRIANGLES',    label: 'Red warning triangles',                   category: 'Safety equipment', critical: true },
+  { code: 'FIRST_AID',    label: 'First aid kit',                           category: 'Safety equipment', critical: false },
+  { code: 'PPE',          label: 'PPE — reflective vest and safety shoes',  category: 'Safety equipment', critical: false },
+  { code: 'LICENCE_DISC', label: 'Licence disc displayed and valid',        category: 'Documents',        critical: true },
+  { code: 'DRIVER_DOCS',  label: "Driver's licence and PrDP carried",       category: 'Documents',        critical: true },
+  { code: 'PERMITS',      label: 'Trip permits and load documentation',     category: 'Documents',        critical: true },
 ];
 
-// ── SAMPLE DATA ───────────────────────────────────────────────────────────
-// POD's two known vehicles and one driver. Registrations, VINs and the
-// driver's details are PLACEHOLDERS — replace them with the real fleet before
-// the pilot. Everything above this line is real configuration.
-const SAMPLE_ASSETS = [
+// P3: "accidents will also be categorized according to severity".
+const INCIDENT_SEVERITIES = [
+  { code: 'NEAR_MISS', name: 'Near miss' },
+  { code: 'MINOR',     name: 'Minor' },
+  { code: 'SERIOUS',   name: 'Serious' },
+  { code: 'MAJOR',     name: 'Major' },
+  { code: 'FATAL',     name: 'Fatal' },
+];
+
+// Manual 4.14 / module M1. "Bi-annual" is read here as every 24 months; if
+// POD means twice a year, an admin changes refresherMonths to 6 in the UI.
+const TRAINING_COURSES = [
   {
-    code: 'POD-T01',
-    registrationNo: 'JH 12 AB GP',
-    vin: 'SAMPLE0000000T01',
-    typeCode: 'TRUCK_TRACTOR',
-    make: 'Scania', model: 'R460',
-    year: 2019,
-    tareMassKg: 8200, maxMassKg: 25000, maxCombinationMassKg: 56000,
-    odometerKm: 412_500,
+    code: 'M1',
+    name: 'Defensive Driver Training (Module M1)',
+    refresherMonths: 24,
+    description: 'Basic defensive driver training programme, per the RTMS toolkit module M1.',
+  },
+];
+
+// ── REAL DATA FROM POD'S RTMS TOOLKIT ────────────────────────────────────
+// R1 Fleet List, verbatim. Mass is captured in kg because the gate compares
+// kilograms; R1 and every printed register show tonnes.
+const R1_FLEET = [
+  {
+    fleetNo: '1',
+    yearModel: 2026,
+    makeManufacturer: 'UD TRUCKS',
+    registrationNo: 'MX87GSGP',
+    vin: 'JPCZM30A1SS833657',
+    typeCode: 'TRUCK',
+    maxLoadingMassKg: 20_000, // R1 "20 TONNE"
+    maxPassengers: 3,
+    odometerKm: 0,
   },
   {
-    code: 'POD-C01',
-    registrationNo: 'JH 34 CD GP',
-    vin: 'SAMPLE0000000C01',
-    typeCode: 'CAR_CARRIER',
-    make: 'Henred', model: 'Car carrier 8-unit',
-    year: 2020,
-    tareMassKg: 9500, maxMassKg: 24000, maxCombinationMassKg: null,
+    fleetNo: '2',
+    yearModel: 2026,
+    // R1 gives the manufacturer; R2 describes the same unit as "8 CAR CARRIER".
+    makeManufacturer: 'CLAYTON DESIGN & ENGINEERING',
+    registrationNo: 'MY18SDGP',
+    vin: 'AE9B227ABSDNB1129',
+    typeCode: 'TRAILER',
+    maxLoadingMassKg: 27_000, // R1 "27 TONNE"
+    maxPassengers: null, // R1 "N/A"
+    comments: '8 car carrier (R2 description)',
     odometerKm: 0,
   },
 ];
 
-const SAMPLE_DRIVER = {
-  code: 'DRV-001',
-  fullName: 'Tendai Moyo',
-  phoneE164: '+27820000001',
-  email: 'driver1@pod.example',
+// R2 Licence Schedule — both units licensed to 31/03/2027.
+const R2_LICENCES: Record<string, string> = {
+  MX87GSGP: '2027-03-31',
+  MY18SDGP: '2027-03-31',
 };
+
+// R16 Drivers Licence Schedule. The document records the issue date as
+// 31/10/2025 and expiry as 30/10/2023 — expiry before issue, so the two
+// columns were transposed on the form. Seeded the corrected way round; the
+// licence is still expired against today's date, which is the truth POD
+// needs to see rather than a number that merely looks tidy.
+const R16_DRIVER = {
+  employeeNo: '1',
+  surname: 'Musvari',
+  firstName: 'Mark',
+  licenceNumber: '01/200813PNN0008',
+  licenceIssuedOn: '2023-10-30',
+  licenceExpiresOn: '2025-10-31',
+};
+
+// R5 Risk Assessment ships pre-populated with POD's eight standard hazards.
+const R5_HAZARDS: Array<{ hazardIdentified: string; impact: string }> = [
+  { hazardIdentified: 'Vehicles overloaded', impact: 'Vehicle does not brake as expected, thus will not be able to stop timeously in an emergency. Vehicle damaged due to excessive strain on engine and components' },
+  { hazardIdentified: 'Unlicensed Vehicles', impact: 'Insurer may repudiate claim in the event of an accident. Legal liability' },
+  { hazardIdentified: 'Travelling at unsafe speeds', impact: 'Vehicle is more likely to lose control/crash' },
+  { hazardIdentified: 'Using unsafe vehicles', impact: 'Vehicle is more likely to lose control/crash' },
+  { hazardIdentified: 'Drivers distracted – use of mobile phones', impact: 'Driver may lose control of vehicle' },
+  { hazardIdentified: 'Drivers intoxicated (alcohol/drugs)', impact: 'Driver may cause an accident' },
+  { hazardIdentified: 'Driver falls asleep or lacks focus due fatigue', impact: 'Driver may lose control of vehicle' },
+  { hazardIdentified: 'Unsafe driving behaviours e.g., unsafe following distance', impact: 'May result in an accident/crash' },
+];
+
+// R3 Trip Mass Record — the two trips already on POD's form.
+const R3_TRIPS = [
+  { date: '2026-08-15', registrationNo: 'MX87GSGP', massLoadedKg: 7_400 },
+  { date: '2026-08-18', registrationNo: 'MX87GSGP', massLoadedKg: 11_700 },
+];
 
 const POLICIES = [
   { code: 'SAFETY_POLICY',    title: 'Road safety policy',       rtmsElement: 'MANAGEMENT_COMMITMENT' as RtmsElement,
@@ -174,174 +246,184 @@ const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
 export async function seedRtms(prisma: PrismaClient) {
   // ── Lookups ──────────────────────────────────────────────────────────
   for (const [i, t] of ASSET_TYPES.entries()) {
-    await prisma.assetType.upsert({
-      where: { code: t.code },
-      update: { sortOrder: i },
-      create: { ...t, sortOrder: i },
-    });
+    await prisma.assetType.upsert({ where: { code: t.code }, update: { sortOrder: i }, create: { ...t, sortOrder: i } });
   }
-
   for (const [i, k] of COMPLIANCE_KINDS.entries()) {
     await prisma.complianceKind.upsert({
       where: { code: k.code },
-      // Behavioural flags are re-asserted on every seed; `name` is left alone
-      // so an admin rename survives.
-      update: {
-        sortOrder: i,
-        ownerType: k.ownerType,
-        requiredForOperation: k.requiredForOperation,
-        rtmsElement: k.rtmsElement,
-      },
+      // Behavioural flags are re-asserted each seed; `name` is left alone so
+      // an admin rename survives.
+      update: { sortOrder: i, ownerType: k.ownerType, requiredForOperation: k.requiredForOperation, rtmsElement: k.rtmsElement },
       create: { ...k, sortOrder: i },
     });
   }
+  for (const [i, x] of WORK_ORDER_STATUSES.entries())
+    await prisma.workOrderStatus.upsert({ where: { code: x.code }, update: { sortOrder: i, isTerminal: x.isTerminal }, create: { ...x, sortOrder: i } });
+  for (const [i, x] of TRIP_STATUSES.entries())
+    await prisma.tripStatus.upsert({ where: { code: x.code }, update: { sortOrder: i, isTerminal: x.isTerminal }, create: { ...x, sortOrder: i } });
+  for (const [i, x] of INCIDENT_STATUSES.entries())
+    await prisma.incidentStatus.upsert({ where: { code: x.code }, update: { sortOrder: i, isTerminal: x.isTerminal }, create: { ...x, sortOrder: i } });
+  for (const [i, x] of INCIDENT_CATEGORIES.entries())
+    await prisma.incidentCategory.upsert({ where: { code: x.code }, update: { sortOrder: i }, create: { ...x, sortOrder: i } });
+  for (const [i, x] of INCIDENT_SEVERITIES.entries())
+    await prisma.incidentSeverity.upsert({ where: { code: x.code }, update: { sortOrder: i }, create: { ...x, sortOrder: i } });
+  for (const [i, x] of INSPECTION_ITEMS.entries())
+    await prisma.inspectionItemDef.upsert({ where: { code: x.code }, update: { sortOrder: i, critical: x.critical, category: x.category }, create: { ...x, sortOrder: i } });
+  for (const [i, c] of TRAINING_COURSES.entries())
+    await prisma.trainingCourse.upsert({ where: { code: c.code }, update: { sortOrder: i, refresherMonths: c.refresherMonths }, create: { ...c, sortOrder: i } });
 
-  for (const [i, s] of WORK_ORDER_STATUSES.entries()) {
-    await prisma.workOrderStatus.upsert({
-      where: { code: s.code }, update: { sortOrder: i, isTerminal: s.isTerminal }, create: { ...s, sortOrder: i },
-    });
+  // ── Policies P1–P6 (versioned; a new version is a new row) ────────────
+  for (const pol of POLICIES) {
+    const existing = await prisma.policy.findFirst({ where: { code: pol.code }, orderBy: { version: 'desc' } });
+    if (!existing) await prisma.policy.create({ data: { ...pol, version: 1, effectiveFrom: new Date() } });
   }
-  for (const [i, s] of TRIP_STATUSES.entries()) {
-    await prisma.tripStatus.upsert({
-      where: { code: s.code }, update: { sortOrder: i, isTerminal: s.isTerminal }, create: { ...s, sortOrder: i },
-    });
-  }
-  for (const [i, s] of INCIDENT_STATUSES.entries()) {
-    await prisma.incidentStatus.upsert({
-      where: { code: s.code }, update: { sortOrder: i, isTerminal: s.isTerminal }, create: { ...s, sortOrder: i },
-    });
-  }
-  for (const [i, c] of INCIDENT_CATEGORIES.entries()) {
-    await prisma.incidentCategory.upsert({
-      where: { code: c.code }, update: { sortOrder: i }, create: { ...c, sortOrder: i },
-    });
-  }
-  for (const [i, item] of INSPECTION_ITEMS.entries()) {
-    await prisma.inspectionItemDef.upsert({
-      where: { code: item.code },
-      update: { sortOrder: i, critical: item.critical, category: item.category },
-      create: { ...item, sortOrder: i },
-    });
-  }
-
-  // ── Policies (versioned; a new version is a new row) ─────────────────
-  for (const p of POLICIES) {
-    const existing = await prisma.policy.findFirst({
-      where: { code: p.code }, orderBy: { version: 'desc' },
-    });
-    if (!existing) {
-      await prisma.policy.create({
-        data: { ...p, version: 1, effectiveFrom: new Date() },
-      });
-    }
-  }
-
   for (const o of safetyObjectives(new Date())) {
-    const existing = await prisma.safetyObjective.findFirst({
-      where: { metric: o.metric, periodStart: o.periodStart },
-    });
+    const existing = await prisma.safetyObjective.findFirst({ where: { metric: o.metric, periodStart: o.periodStart } });
     if (!existing) await prisma.safetyObjective.create({ data: o });
   }
 
-  // ── Sample fleet ─────────────────────────────────────────────────────
-  const kindByCode = Object.fromEntries(
-    (await prisma.complianceKind.findMany()).map((k) => [k.code, k]),
-  );
-
-  for (const a of SAMPLE_ASSETS) {
-    const type = await prisma.assetType.findUniqueOrThrow({ where: { code: a.typeCode } });
-    const { typeCode, ...rest } = a;
-    const asset = await prisma.asset.upsert({
-      where: { code: a.code },
-      update: {},
-      create: { ...rest, typeId: type.id },
-    });
-
-    // A maintenance plan: whichever of 25 000 km / 6 months falls first.
-    const plan = await prisma.maintenancePlan.findFirst({ where: { assetId: asset.id } });
-    if (!plan && !type.isTrailer) {
-      await prisma.maintenancePlan.create({
-        data: {
-          assetId: asset.id,
-          intervalKm: 25_000,
-          intervalMonths: 6,
-          lastServiceOdoKm: asset.odometerKm - 18_000,
-          lastServiceDate: daysFromNow(-120),
-          nextDueOdoKm: asset.odometerKm + 7_000,
-          nextDueDate: daysFromNow(62),
-        },
-      });
-    }
-
-    // Compliance items — deliberately spread across VALID / DUE_SOON /
-    // EXPIRED so the RAG dashboard and the gate have something to show on
-    // day one. `status` is left at its default: the engine derives it.
-    const assetItems: Array<[string, number, string]> = type.isTrailer
-      ? [['VEHICLE_LICENCE', 210, 'LIC-C01-2026'], ['COF', 12, 'COF-C01-2026'], ['INSURANCE', 300, 'INS-88213']]
-      : [['VEHICLE_LICENCE', 240, 'LIC-T01-2026'], ['COF', 95, 'COF-T01-2026'],
-         ['INSURANCE', 300, 'INS-88212'], ['CBRTA_PERMIT', -6, 'CBRTA-4471']];
-
-    for (const [code, inDays, reference] of assetItems) {
-      const kind = kindByCode[code];
-      if (!kind) continue;
-      const exists = await prisma.complianceItem.findFirst({
-        where: { assetId: asset.id, kindId: kind.id, archivedAt: null },
-      });
-      if (exists) continue;
-      await prisma.complianceItem.create({
-        data: {
-          ownerType: 'ASSET',
-          assetId: asset.id,
-          kindId: kind.id,
-          reference,
-          issuedOn: daysFromNow(inDays - 365),
-          expiresOn: daysFromNow(inDays),
-        },
-      });
-    }
-  }
-
-  const driver = await prisma.driver.upsert({
-    where: { code: SAMPLE_DRIVER.code },
-    update: {},
-    create: { ...SAMPLE_DRIVER, hiredOn: daysFromNow(-800) },
-  });
-
-  const driverItems: Array<[string, number, string]> = [
-    ['DRIVER_LICENCE', 400, 'DL-8841220'],
-    ['PRDP',            25, 'PRDP-449120'],   // DUE_SOON — exercises the amber path
-    ['MEDICAL',        150, 'MED-2026-114'],
-    ['PASSPORT',       900, 'ZN1234567'],
-    ['SUBSTANCE_ACK',  200, 'ACK-2026'],
-  ];
-  for (const [code, inDays, reference] of driverItems) {
-    const kind = kindByCode[code];
-    if (!kind) continue;
-    const exists = await prisma.complianceItem.findFirst({
-      where: { driverId: driver.id, kindId: kind.id, archivedAt: null },
-    });
-    if (exists) continue;
-    await prisma.complianceItem.create({
+  // ── R5 Risk Assessment with POD's eight standard hazards ─────────────
+  let risk = await prisma.riskAssessment.findFirst({ where: { title: 'POD Logistics transport risk assessment' } });
+  if (!risk) {
+    risk = await prisma.riskAssessment.create({
       data: {
-        ownerType: 'DRIVER',
-        driverId: driver.id,
-        kindId: kind.id,
-        reference,
-        issuedOn: daysFromNow(inDays - 365),
-        expiresOn: daysFromNow(inDays),
+        title: 'POD Logistics transport risk assessment',
+        scope: 'All aspects of the operation that can affect the safety of other road users (RTMS element 2).',
+        rtmsElement: 'RISK_MANAGEMENT',
+        assessedOn: new Date(),
+        hazards: { create: R5_HAZARDS.map((h, i) => ({ ...h, sortOrder: i })) },
       },
     });
   }
 
+  const kindByCode = Object.fromEntries((await prisma.complianceKind.findMany()).map((k) => [k.code, k]));
+  const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  const addItem = async (
+    owner: { assetId?: string; driverId?: string },
+    code: string,
+    reference: string | null,
+    issuedOn: Date | null,
+    expiresOn: Date | null,
+  ) => {
+    const kind = kindByCode[code];
+    if (!kind) return;
+    const exists = await prisma.complianceItem.findFirst({
+      where: { ...owner, kindId: kind.id, archivedAt: null },
+    });
+    if (exists) return;
+    await prisma.complianceItem.create({
+      data: { ownerType: kind.ownerType, ...owner, kindId: kind.id, reference, issuedOn, expiresOn },
+    });
+  };
+
+  // ── R1 Fleet List + R2 Licence Schedule ──────────────────────────────
+  const assetByReg: Record<string, string> = {};
+  for (const a of R1_FLEET) {
+    const type = await prisma.assetType.findUniqueOrThrow({ where: { code: a.typeCode } });
+    const { typeCode, ...rest } = a;
+    const asset = await prisma.asset.upsert({
+      where: { registrationNo: a.registrationNo },
+      update: {},
+      create: { ...rest, typeId: type.id },
+    });
+    assetByReg[a.registrationNo] = asset.id;
+
+    const licenceExpiry = R2_LICENCES[a.registrationNo];
+    if (licenceExpiry) await addItem({ assetId: asset.id }, 'VEHICLE_LICENCE', null, null, d(licenceExpiry));
+
+    // R11 maintenance schedule. Trailers are serviced too (manual 4.10:
+    // "The service schedule is also applicable to trailers").
+    const plan = await prisma.maintenancePlan.findFirst({ where: { assetId: asset.id } });
+    if (!plan) {
+      await prisma.maintenancePlan.create({
+        data: {
+          assetId: asset.id,
+          intervalKm: type.isTrailer ? null : 25_000,
+          intervalMonths: 6,
+          lastServiceDate: new Date(),
+          lastServiceOdoKm: asset.odometerKm,
+        },
+      });
+    }
+  }
+
+  // ── R16 Drivers Licence Schedule ─────────────────────────────────────
+  const { licenceNumber, licenceIssuedOn, licenceExpiresOn, ...driverFields } = R16_DRIVER;
+  const driver = await prisma.driver.upsert({
+    where: { employeeNo: R16_DRIVER.employeeNo },
+    update: {},
+    create: driverFields,
+  });
+  await addItem({ driverId: driver.id }, 'DRIVER_LICENCE', licenceNumber, d(licenceIssuedOn), d(licenceExpiresOn));
+  // R15 has no data yet and the toolkit carries no PrDP column, so these are
+  // left uncaptured rather than invented. The gate reports them as missing,
+  // which is the honest position until POD supplies them.
+
+  // ── R3 Trip Mass Record: the two trips already on the form ───────────
+  const plannedStatus = await prisma.tripStatus.findUnique({ where: { code: 'DELIVERED' } });
+  for (const [i, t] of R3_TRIPS.entries()) {
+    const assetId = assetByReg[t.registrationNo];
+    if (!assetId || !plannedStatus) continue;
+    const reference = `TRIP-2026-${String(i + 1).padStart(4, '0')}`;
+    const existing = await prisma.assignment.findUnique({ where: { reference } });
+    if (existing) continue;
+    const asset = await prisma.asset.findUniqueOrThrow({ where: { id: assetId } });
+    const assignment = await prisma.assignment.create({
+      data: {
+        reference,
+        assetId,
+        driverId: driver.id,
+        statusId: plannedStatus.id,
+        actualDepartureAt: d(t.date),
+        actualArrivalAt: d(t.date),
+        gateDecision: 'PASS',
+        gateCheckedAt: d(t.date),
+      },
+    });
+    await prisma.tripMassRecord.create({
+      data: {
+        assignmentId: assignment.id,
+        assetId,
+        date: d(t.date),
+        massLoadedKg: t.massLoadedKg,
+        overloaded: t.massLoadedKg > asset.maxLoadingMassKg, // R3 "Overloaded (Yes/No)"
+        permissibleMaxKg: asset.maxLoadingMassKg,
+      },
+    });
+  }
+
+  // Rows from an earlier seed that the toolkit does not contain are
+  // deactivated rather than deleted — a lookup may already be referenced by
+  // a historical record, and RTMS evidence is never rewritten in place. They
+  // vanish from every dropdown; an admin can revive one if POD actually uses it.
+  const deactivateStale = async (
+    delegate: { updateMany: (a: any) => Promise<{ count: number }> },
+    keep: string[],
+  ) => (await delegate.updateMany({ where: { code: { notIn: keep }, active: true }, data: { active: false } })).count;
+
+  const staleDeactivated =
+    (await deactivateStale(prisma.assetType, ASSET_TYPES.map((x) => x.code))) +
+    (await deactivateStale(prisma.complianceKind, COMPLIANCE_KINDS.map((x) => x.code))) +
+    (await deactivateStale(prisma.inspectionItemDef, INSPECTION_ITEMS.map((x) => x.code))) +
+    (await deactivateStale(prisma.incidentCategory, INCIDENT_CATEGORIES.map((x) => x.code))) +
+    (await deactivateStale(prisma.incidentSeverity, INCIDENT_SEVERITIES.map((x) => x.code)));
+
   const counts = {
-    assetTypes: await prisma.assetType.count(),
-    complianceKinds: await prisma.complianceKind.count(),
-    inspectionItems: await prisma.inspectionItemDef.count(),
+    assetTypes: await prisma.assetType.count({ where: { active: true } }),
+    complianceKinds: await prisma.complianceKind.count({ where: { active: true } }),
+    inspectionItems: await prisma.inspectionItemDef.count({ where: { active: true } }),
     assets: await prisma.asset.count(),
     drivers: await prisma.driver.count(),
     complianceItems: await prisma.complianceItem.count(),
+    hazards: await prisma.hazard.count(),
+    trips: await prisma.assignment.count(),
+    massRecords: await prisma.tripMassRecord.count(),
     policies: await prisma.policy.count(),
+    trainingCourses: await prisma.trainingCourse.count(),
   };
-  console.log('Seeded RTMS fleet & compliance:', counts);
-  console.log('  NOTE: sample vehicle registrations, VINs and driver details are placeholders.');
+  console.log('Seeded RTMS from POD toolkit (R1, R2, R3, R5, R16, P1-P6, M1):', counts);
+  if (staleDeactivated) console.log(`  Deactivated ${staleDeactivated} lookup row(s) not present in the toolkit.`);
+  console.log('  Pre-trip checklist items are DERIVED from P5/P4 + NRTA minimums — R14 is not in the toolkit folder.');
+  console.log('  R15 medical and PrDP expiry dates are not in the toolkit; the gate will report them missing.');
 }

@@ -51,15 +51,29 @@ const esc = (v: unknown) =>
 
 export const escapeHtml = esc;
 
-export const fmtDate = (d: Date | string | null | undefined) =>
-  d ? new Date(d).toISOString().slice(0, 10) : '—';
+// POD's registers write dates DD/MM/YYYY (R2 "31/03/2027", R16 "30/10/2023").
+export const fmtDate = (d: Date | string | null | undefined) => {
+  if (!d) return '';
+  const x = new Date(d);
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${p2(x.getUTCDate())}/${p2(x.getUTCMonth() + 1)}/${x.getUTCFullYear()}`;
+};
+
+// R1 writes masses as "20 TONNE"; R3 as "7.4 TONNE".
+export const fmtTonnes = (kg: number | null | undefined) => {
+  if (kg === null || kg === undefined) return '';
+  const t = kg / 1000;
+  return `${Number.isInteger(t) ? t.toFixed(0) : t.toFixed(1)} TONNE`;
+};
 
 export const fmtNum = (n: number | null | undefined, dp = 0) =>
   n === null || n === undefined ? '—' : Number(n).toLocaleString('en-ZA', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 export interface Column<T> {
   header: string;
-  value: (row: T) => string;
+  // The index is passed because several registers open with a "No." column
+  // that simply numbers the rows (R8, R9, R10, R16).
+  value: (row: T, index: number) => string;
   numeric?: boolean;
   raw?: boolean; // value() already returns safe HTML (pills)
 }
@@ -69,11 +83,11 @@ export function table<T>(rows: T[], columns: Column<T>[], emptyText = 'No record
   const head = columns.map((c) => `<th${c.numeric ? ' class="num"' : ''}>${esc(c.header)}</th>`).join('');
   const body = rows
     .map(
-      (r) =>
+      (r, rowIndex) =>
         '<tr>' +
         columns
           .map((c) => {
-            const v = c.value(r);
+            const v = c.value(r, rowIndex);
             return `<td${c.numeric ? ' class="num"' : ''}>${c.raw ? v : esc(v)}</td>`;
           })
           .join('') +

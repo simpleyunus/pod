@@ -46,29 +46,38 @@ export const PodCaptureSchema = z.object({
   actualArrivalAt: dateOpt,
 });
 
-export const MassRecordSchema = z.object({
-  massLoadedKg: z.number().int().min(0).max(500_000),
-  measuredAt: dateOpt,
-  weighbridgeRef: nullableString(60),
-  documentFileId: z.string().nullable().optional(),
-  notes: nullableString(500),
-});
+// R3 Trip Mass Record. The form's single "Mass Loaded/Passengers Loaded"
+// column means a trip carries one or the other, so at least one is required.
+export const MassRecordSchema = z
+  .object({
+    date: dateOpt,
+    massLoadedKg: z.number().int().min(0).max(500_000).nullable().optional(),
+    passengersLoaded: z.number().int().min(0).max(200).nullable().optional(),
+    documentFileId: z.string().nullable().optional(),
+    comments: nullableString(500),
+  })
+  .refine((v) => v.massLoadedKg != null || v.passengersLoaded != null, {
+    message: 'Record either a mass loaded or a passenger count',
+  });
 
+// R8 Accident Investigation Register + P3 categorisation.
 export const IncidentCreateSchema = z.object({
-  occurredAt: dateReq,
-  assetId: z.string().nullable().optional(),
-  driverId: z.string().nullable().optional(),
+  date: dateReq, // R8 "Date"
+  assetId: z.string().nullable().optional(), // R8 "Vehicle Reg. No."
+  driverId: z.string().nullable().optional(), // R8 "Driver Name"
   assignmentId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
+  severityId: z.string().nullable().optional(), // P3 severity
+  faultCategory: z.enum(['DRIVER_FAULT', 'THIRD_PARTY_FAULT', 'SHARED', 'UNDETERMINED']).nullable().optional(),
+  description: z.string().min(1).max(8000), // R8 "Description of Incident/Accident"
+  cause: nullableString(4000), // R8 "Cause of the incident/accident"
+  isNearMiss: z.boolean().optional(), // manual 4.8
   locationText: nullableString(200),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
-  description: z.string().min(1).max(8000),
   injuries: z.number().int().min(0).max(1000).optional(),
   vehicleDamage: z.boolean().optional(),
   thirdPartyInvolved: z.boolean().optional(),
-  estimatedCost: z.number().min(0).nullable().optional(),
-  currency: z.string().length(3).optional(),
+  sapsReportNumber: nullableString(60), // P3: report within 24h
+  sapsReportedAt: dateOpt,
   photoFileIds: z.array(z.string()).max(20).optional(),
 });
 
@@ -95,30 +104,24 @@ export const CorrectiveActionUpdateSchema = z.object({
   notes: nullableString(1000),
 });
 
+// R10 Traffic Fine Register — the form has no amount or payment column.
 export const FineSchema = z.object({
-  noticeNumber: nullableString(60),
-  issuedOn: dateReq,
-  assetId: z.string().nullable().optional(),
-  driverId: z.string().nullable().optional(),
+  date: dateReq, // R10 "Date"
+  assetId: z.string().nullable().optional(), // R10 "Vehicle Reg. No."
+  driverId: z.string().nullable().optional(), // R10 "Driver Name"
   assignmentId: z.string().nullable().optional(),
-  reason: z.string().min(1).max(500),
-  amount: z.number().min(0),
-  currency: z.string().length(3).optional(),
-  dueDate: dateOpt,
-  paidOn: dateOpt,
-  status: z.enum(['UNPAID', 'PAID', 'CONTESTED', 'WRITTEN_OFF']).optional(),
-  correctiveAction: nullableString(1000),
+  reason: z.string().min(1).max(500), // R10 "What is the reason for the traffic fine"
+  correctiveActionsTaken: nullableString(1000), // R10 "Corrective actions taken"
+  noticeNumber: nullableString(60),
   documentFileId: z.string().nullable().optional(),
 });
 
-export const SpeedEventSchema = z.object({
-  assetId: z.string().min(1),
-  driverId: z.string().nullable().optional(),
+// R7 Speed Trend Analysis Report — descriptive, not a telematics reading.
+export const SpeedTrendSchema = z.object({
+  date: dateReq, // R7 "DATE"
+  driverId: z.string().nullable().optional(), // R7 "DRIVER"
+  assetId: z.string().min(1), // R7 "VEHICLE REG"
   assignmentId: z.string().nullable().optional(),
-  occurredAt: dateReq,
-  speedKph: z.number().int().min(0).max(300),
-  limitKph: z.number().int().min(0).max(300),
-  locationText: nullableString(200),
-  source: nullableString(40),
-  actionTaken: nullableString(1000),
+  speedTrend: z.string().min(1).max(2000), // R7 "DESCRIBE SPEED TREND"
+  actionsTaken: nullableString(2000), // R7 "ACTIONS TAKEN"
 });

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { driverName } from '../fleet/naming';
 import { DAY_MS } from './compliance.engine';
 
 // RTMS driver-wellness limits. Defaults are the standard's; each is
@@ -107,12 +108,12 @@ export class FatigueService {
   async breachingDrivers(at: Date = new Date()) {
     const drivers = await this.prisma.driver.findMany({
       where: { active: true },
-      select: { id: true, fullName: true, code: true },
+      select: { id: true, surname: true, firstName: true, employeeNo: true },
     });
-    const out: { id: string; fullName: string; code: string; breaches: { code: string; detail: string }[] }[] = [];
+    const out: { id: string; fullName: string; employeeNo: string; breaches: { code: string; detail: string }[] }[] = [];
     for (const d of drivers) {
       const res = await this.check(d.id, at);
-      if (!res.ok) out.push({ ...d, breaches: res.breaches });
+      if (!res.ok) out.push({ id: d.id, employeeNo: d.employeeNo, fullName: driverName(d), breaches: res.breaches });
     }
     return out;
   }
