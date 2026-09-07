@@ -36,8 +36,8 @@ export default function AssetDetailClient({ id }: { id: string }) {
       </Button>
 
       <PageHeader
-        title={`${asset.code} · ${asset.registrationNo}`}
-        subtitle={[asset.type?.name, asset.make, asset.model, asset.year].filter(Boolean).join(' · ')}
+        title={`${asset.fleetNo} · ${asset.registrationNo}`}
+        subtitle={[asset.type?.name, asset.makeManufacturer, asset.yearModel].filter(Boolean).join(' · ')}
         extra={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <RagTag status={asset.complianceStatus} />
@@ -55,12 +55,12 @@ export default function AssetDetailClient({ id }: { id: string }) {
           <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4', height: '100%' }}>
             <Descriptions column={1} size="small" labelStyle={{ color: '#98A0AC', fontSize: 12 }}>
               <Descriptions.Item label="VIN">{asset.vin ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="Tare mass">{asset.tareMassKg ? `${asset.tareMassKg.toLocaleString()} kg` : '—'}</Descriptions.Item>
-              <Descriptions.Item label="Permissible maximum">
-                <Text strong>{asset.maxMassKg.toLocaleString()} kg</Text>
+              <Descriptions.Item label="Maximum loading mass">
+                <Text strong>{(asset.maxLoadingMassKg / 1000).toLocaleString()} tonne</Text>
                 <Text style={{ fontSize: 11, color: '#98A0AC', marginLeft: 6 }}>every load is checked against this</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Combination max">{asset.maxCombinationMassKg ? `${asset.maxCombinationMassKg.toLocaleString()} kg` : '—'}</Descriptions.Item>
+              <Descriptions.Item label="Maximum passengers">{asset.maxPassengers ?? 'N/A'}</Descriptions.Item>
+              <Descriptions.Item label="Comments">{asset.comments ?? '—'}</Descriptions.Item>
               <Descriptions.Item label="Odometer">{asset.odometerKm.toLocaleString()} km</Descriptions.Item>
             </Descriptions>
           </Card>
@@ -122,7 +122,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
                   columns={[
                     { title: 'Performed', dataIndex: 'performedAt', render: (v) => new Date(v).toLocaleString('en-GB') },
                     { title: 'Odometer', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
-                    { title: 'Result', dataIndex: 'passed', render: (v) => <RagTag status={v ? 'PASS' : 'FAIL'} /> },
+                    { title: 'Result', dataIndex: 'passed', render: (v) => <RagTag status={v ? 'PASS' : 'FAIL'} label={v ? 'Pass' : 'Defect'} /> },
                   ]}
                 />
               </Card>
@@ -136,11 +136,12 @@ export default function AssetDetailClient({ id }: { id: string }) {
                   rowKey="id" dataSource={asset.tyreRecords} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No tyre records' }}
                   columns={[
-                    { title: 'Position', dataIndex: 'position' },
-                    { title: 'Action', dataIndex: 'action' },
-                    { title: 'Brand / size', render: (_: any, r: any) => [r.brand, r.size].filter(Boolean).join(' ') || '—' },
-                    { title: 'Tread', dataIndex: 'treadDepthMm', align: 'right' as const, render: (v) => v ? `${v} mm` : '—' },
-                    { title: 'Fitted', dataIndex: 'fittedOn', render: (v) => fmtDate(v) },
+                    // R12 Tyre Management Record columns.
+                    { title: 'Tyre fitted', dataIndex: 'tyreFitted' },
+                    { title: 'Reason for fitment', dataIndex: 'reasonForFitment', render: (v) => v ?? '—' },
+                    { title: 'Position', dataIndex: 'tyrePosition' },
+                    { title: 'Balancing / alignment', dataIndex: 'balancingAlignmentDone', render: (v) => v === null ? '—' : v ? 'Yes' : 'No' },
+                    { title: 'Date', dataIndex: 'date', render: (v) => fmtDate(v) },
                   ]}
                 />
               </Card>
@@ -155,7 +156,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
                   locale={{ emptyText: 'No trips' }}
                   columns={[
                     { title: 'Trip', dataIndex: 'reference' },
-                    { title: 'Driver', dataIndex: ['driver', 'fullName'] },
+                    { title: 'Driver', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
                     { title: 'Departed', dataIndex: 'actualDepartureAt', render: (v) => fmtDate(v) },
                     { title: 'Status', dataIndex: ['status', 'name'] },
                     { title: 'Gate', dataIndex: 'gateDecision', render: (v) => v ? <RagTag status={v} size="sm" /> : '—' },

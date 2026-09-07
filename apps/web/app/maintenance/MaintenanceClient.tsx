@@ -70,11 +70,12 @@ export default function MaintenanceClient() {
                   rowKey="planId" dataSource={data.servicesDue} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No maintenance plans configured' }}
                   columns={[
-                    { title: 'Vehicle', render: (_: any, r: any) => <Text strong style={{ fontSize: 13 }}>{r.assetCode}</Text> },
-                    { title: 'Registration', dataIndex: 'registrationNo' },
+                    // R11 Vehicle Maintenance Schedule columns.
+                    { title: 'Fleet nr', render: (_: any, r: any) => <Text strong style={{ fontSize: 13 }}>{r.fleetNo}</Text> },
+                    { title: 'Vehicle reg no', dataIndex: 'registrationNo' },
                     { title: 'Plan', dataIndex: 'name' },
-                    { title: 'Odometer', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => `${v.toLocaleString()} km` },
-                    { title: 'Due at', dataIndex: 'nextDueOdoKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
+                    { title: 'Kilometres now', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => `${v.toLocaleString()} km` },
+                    { title: 'Next service due (km)', dataIndex: 'nextDueOdoKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
                     {
                       title: 'km left', dataIndex: 'kmRemaining', align: 'right' as const,
                       render: (v: number | null) => v === null ? '—' : (
@@ -83,7 +84,7 @@ export default function MaintenanceClient() {
                         </Text>
                       ),
                     },
-                    { title: 'Due date', dataIndex: 'nextDueDate', render: (v) => fmtDate(v) },
+                    { title: 'Next service due (date)', dataIndex: 'nextDueDate', render: (v) => fmtDate(v) },
                     {
                       title: 'Status',
                       render: (_: any, r: any) => (
@@ -122,7 +123,7 @@ function WorkOrdersTab() {
         locale={{ emptyText: 'No work orders yet' }}
         columns={[
           { title: 'Job no', dataIndex: 'number', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
-          { title: 'Vehicle', dataIndex: ['asset', 'code'] },
+          { title: 'Vehicle', dataIndex: ['asset', 'fleetNo'] },
           { title: 'Title', dataIndex: 'title' },
           { title: 'Raised', dataIndex: 'requestedAt', render: (v) => fmtDate(v) },
           {
@@ -172,12 +173,12 @@ function InspectionsTab() {
           expandedRowRender: (r: any) => (
             <Table
               rowKey="id" size="small" pagination={false}
-              dataSource={r.results.filter((x: any) => x.outcome !== 'PASS')}
-              locale={{ emptyText: 'All items passed' }}
+              dataSource={r.results.filter((x: any) => x.answer === 'NO')}
+              locale={{ emptyText: 'Every item marked Yes' }}
               columns={[
                 { title: 'Item', dataIndex: ['item', 'label'] },
                 { title: 'Critical', dataIndex: ['item', 'critical'], render: (v) => v ? <RagTag status="RED" label="critical" size="sm" /> : '—' },
-                { title: 'Outcome', dataIndex: 'outcome', render: (v) => <RagTag status={v === 'FAIL' ? 'FAIL' : 'NEUTRAL'} label={v} size="sm" /> },
+                { title: 'Yes / No', dataIndex: 'answer', render: (v) => <RagTag status={v === 'NO' ? 'FAIL' : 'PASS'} label={v === 'NO' ? 'No' : 'Yes'} size="sm" /> },
                 { title: 'Note', dataIndex: 'note', render: (v) => v ?? '—' },
                 { title: 'Work order', dataIndex: 'workOrderId', render: (v) => v ? 'raised' : '—' },
               ]}
@@ -186,10 +187,10 @@ function InspectionsTab() {
         }}
         columns={[
           { title: 'Performed', dataIndex: 'performedAt', render: (v) => new Date(v).toLocaleString('en-GB') },
-          { title: 'Vehicle', dataIndex: ['asset', 'code'] },
-          { title: 'Driver', dataIndex: ['driver', 'fullName'], render: (v) => v ?? '—' },
+          { title: 'Vehicle', dataIndex: ['asset', 'fleetNo'] },
+          { title: 'Driver', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
           { title: 'Odometer', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
-          { title: 'Result', dataIndex: 'passed', render: (v) => <RagTag status={v ? 'PASS' : 'FAIL'} /> },
+          { title: 'Result', dataIndex: 'passed', render: (v) => <RagTag status={v ? 'PASS' : 'FAIL'} label={v ? 'Pass' : 'Defect'} /> },
         ]}
       />
     </Card>

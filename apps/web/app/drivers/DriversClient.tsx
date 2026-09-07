@@ -54,10 +54,12 @@ export default function DriversClient() {
           scroll={{ x: 'max-content' }}
           onRow={(r: any) => ({ onClick: () => setSelected(r.id), style: { cursor: 'pointer' } })}
           columns={[
-            { title: 'Driver no', dataIndex: 'code' },
-            { title: 'Name', dataIndex: 'fullName', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
+            // R15/R16 key on the employee number and split the name.
+            { title: 'Employee no', dataIndex: 'employeeNo' },
+            { title: 'Surname', dataIndex: 'surname', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
+            { title: 'Name', dataIndex: 'firstName' },
+            { title: 'Chronic condition', dataIndex: 'chronicCondition', render: (v) => v ?? '—' },
             { title: 'Phone', dataIndex: 'phoneE164', render: (v) => v ?? '—' },
-            { title: 'Hired', dataIndex: 'hiredOn', render: (v) => fmtDate(v) },
             {
               title: 'Compliance', dataIndex: 'complianceStatus',
               render: (v, r: any) => (
@@ -86,8 +88,12 @@ export default function DriversClient() {
             })
           }
         >
-          <Form.Item name="code" label="Driver number" rules={[{ required: true }]}><Input placeholder="DRV-002" /></Form.Item>
-          <Form.Item name="fullName" label="Full name" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="employeeNo" label="Employee no." rules={[{ required: true }]}><Input placeholder="2" /></Form.Item>
+          <Form.Item name="surname" label="Surname" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="firstName" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="chronicCondition" label="Chronic condition" extra="R15 tracks this so the medical schedule can manage it.">
+            <Input />
+          </Form.Item>
           <Form.Item
             name="phoneE164" label="Phone (E.164)"
             rules={[{ pattern: /^\+[1-9]\d{6,14}$/, message: 'Use international format, e.g. +27821234567' }]}
@@ -96,7 +102,7 @@ export default function DriversClient() {
             <Input placeholder="+27821234567" />
           </Form.Item>
           <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}><Input /></Form.Item>
-          <Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="comments" label="Comments"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
 
@@ -109,7 +115,7 @@ function DriverDetail({ id, onClose }: { id: string | null; onClose: () => void 
   const { data: driver, isLoading } = useDriver(id ?? '');
 
   return (
-    <Modal open={!!id} onCancel={onClose} footer={null} width={780} title={driver?.fullName ?? 'Driver'}>
+    <Modal open={!!id} onCancel={onClose} footer={null} width={780} title={driver ? `${driver.firstName} ${driver.surname}` : 'Driver'}>
       {isLoading || !driver ? (
         <div style={{ padding: 40, textAlign: 'center' }}>Loading…</div>
       ) : (
@@ -153,7 +159,7 @@ function DriverDetail({ id, onClose }: { id: string | null; onClose: () => void 
                   locale={{ emptyText: 'No trips' }}
                   columns={[
                     { title: 'Trip', dataIndex: 'reference' },
-                    { title: 'Vehicle', dataIndex: ['asset', 'code'] },
+                    { title: 'Vehicle', dataIndex: ['asset', 'fleetNo'] },
                     { title: 'Status', dataIndex: ['status', 'name'] },
                     { title: 'Gate', dataIndex: 'gateDecision', render: (v) => v ? <RagTag status={v} size="sm" /> : '—' },
                   ]}

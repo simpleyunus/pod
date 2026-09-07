@@ -311,7 +311,7 @@ function PacksTab() {
   return (
     <>
       <Text style={{ fontSize: 12, color: '#98A0AC', display: 'block', marginBottom: 12 }}>
-        Each pack renders the RTMS report set (R1–R17) through Gotenberg and merges it into one PDF.
+        Each pack renders POD's register set (R1–R17) through Gotenberg and merges it into one PDF, laid out as the toolkit lays them out.
       </Text>
       <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
         <Table

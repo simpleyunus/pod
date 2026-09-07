@@ -124,18 +124,22 @@ export default function TripsClient() {
                         ? <span>{r.deal.make} {r.deal.model}<div style={{ fontSize: 11, color: '#98A0AC' }}>{r.deal.reference}</div></span>
                         : <Text style={{ color: '#98A0AC' }}>—</Text>,
                     },
-                    { title: 'Vehicle', dataIndex: ['asset', 'code'] },
-                    { title: 'Driver', dataIndex: ['driver', 'fullName'] },
+                    { title: 'Vehicle', render: (_: any, r: any) => `${r.asset.fleetNo} · ${r.asset.registrationNo}` },
+                    { title: 'Driver', render: (_: any, r: any) => `${r.driver.firstName} ${r.driver.surname}` },
                     { title: 'Carrier', dataIndex: ['carrier', 'name'], render: (v) => v ?? 'Own fleet' },
                     { title: 'Departs', dataIndex: 'plannedDepartureAt', render: (v) => fmtDate(v) },
                     {
                       title: 'Load', render: (_: any, r: any) => {
                         const m = r.massRecords?.[0];
                         if (!m) return <Text style={{ color: '#98A0AC' }}>not weighed</Text>;
+                        // R3 records mass OR passengers in one column.
+                        const label = m.massLoadedKg !== null
+                          ? `${(m.massLoadedKg / 1000).toFixed(1)} t`
+                          : `${m.passengersLoaded} pax`;
                         return (
                           <span style={{ fontVariantNumeric: 'tabular-nums', color: m.overloaded ? '#B42318' : '#616875', fontWeight: m.overloaded ? 600 : 400 }}>
-                            {m.massLoadedKg.toLocaleString()} kg
-                            {m.overloaded && <div style={{ fontSize: 10.5 }}>over by {(m.massLoadedKg - m.permissibleMaxKg).toLocaleString()} kg</div>}
+                            {label}
+                            {m.overloaded && <div style={{ fontSize: 10.5 }}>OVERLOADED</div>}
                           </span>
                         );
                       },
@@ -262,7 +266,7 @@ function StartTripModal({ trip, onClose }: { trip: any; onClose: () => void }) {
 function MassModal({ trip, onClose }: { trip: any; onClose: () => void }) {
   const [form] = Form.useForm();
   const record = useFleetMutation((body: any) => api.post(`/api/trips/${trip.id}/mass`, body).then((r) => r.data));
-  const max = trip?.asset?.maxMassKg;
+  const max = trip?.asset?.maxLoadingMassKg;
 
   return (
     <Modal
@@ -275,7 +279,7 @@ function MassModal({ trip, onClose }: { trip: any; onClose: () => void }) {
           record.mutate(values, {
             onSuccess: (r: any) => {
               message[r.overloaded ? 'warning' : 'success'](
-                r.overloaded ? `Recorded — OVERLOADED by ${(r.massLoadedKg - r.permissibleMaxKg).toLocaleString()} kg` : 'Load recorded',
+                r.overloaded ? 'Recorded — OVERLOADED' : 'Load recorded',
               );
               form.resetFields();
               onClose();
@@ -284,14 +288,17 @@ function MassModal({ trip, onClose }: { trip: any; onClose: () => void }) {
           })
         }
       >
+        {/* R3 has one column, "Mass Loaded/Passengers Loaded" — record either. */}
         <Form.Item
-          name="massLoadedKg" label="Mass loaded (kg)" rules={[{ required: true }]}
-          extra={max ? `Permissible maximum for this vehicle is ${max.toLocaleString()} kg.` : undefined}
+          name="massLoadedKg" label="Mass loaded (kg)"
+          extra={max ? `Maximum loading mass for this vehicle is ${(max / 1000).toLocaleString()} tonne.` : undefined}
         >
           <InputNumber style={{ width: '100%' }} min={0} />
         </Form.Item>
-        <Form.Item name="weighbridgeRef" label="Weighbridge reference"><Input /></Form.Item>
-        <Form.Item name="notes" label="Notes"><Input.TextArea rows={2} /></Form.Item>
+        <Form.Item name="passengersLoaded" label="or passengers loaded">
+          <InputNumber style={{ width: '100%' }} min={0} />
+        </Form.Item>
+        <Form.Item name="comments" label="Comments"><Input.TextArea rows={2} /></Form.Item>
       </Form>
     </Modal>
   );
@@ -392,13 +399,17 @@ function MassTab() {
           rowKey="id" dataSource={data?.records ?? []} pagination={{ pageSize: 15, hideOnSinglePage: true }}
           scroll={{ x: 'max-content' }} locale={{ emptyText: 'No mass records' }}
           columns={[
-            { title: 'Measured', dataIndex: 'measuredAt', render: (v) => new Date(v).toLocaleString('en-GB') },
+            // R3 Trip Mass Record columns.
+            { title: 'Date', dataIndex: 'date', render: (v) => new Date(v).toLocaleDateString('en-GB') },
+            { title: 'Vehicle reg no', dataIndex: ['asset', 'registrationNo'] },
+            {
+              title: 'Mass loaded / passengers loaded', align: 'right' as const,
+              render: (_: any, r: any) => r.massLoadedKg !== null
+                ? `${(r.massLoadedKg / 1000).toFixed(1)} tonne`
+                : `${r.passengersLoaded} passengers`,
+            },
+            { title: 'Overloaded (Yes/No)', dataIndex: 'overloaded', render: (v) => <RagTag status={v ? 'FAIL' : 'PASS'} label={v ? 'Yes' : 'No'} /> },
             { title: 'Trip', dataIndex: ['assignment', 'reference'] },
-            { title: 'Vehicle', dataIndex: ['asset', 'code'] },
-            { title: 'Loaded', dataIndex: 'massLoadedKg', align: 'right' as const, render: (v) => `${v.toLocaleString()} kg` },
-            { title: 'Permissible', dataIndex: 'permissibleMaxKg', align: 'right' as const, render: (v) => `${v.toLocaleString()} kg` },
-            { title: 'Result', dataIndex: 'overloaded', render: (v) => <RagTag status={v ? 'FAIL' : 'PASS'} label={v ? 'OVERLOADED' : 'LEGAL'} /> },
-            { title: 'Weighbridge', dataIndex: 'weighbridgeRef', render: (v) => v ?? '—' },
           ]}
         />
       </Card>

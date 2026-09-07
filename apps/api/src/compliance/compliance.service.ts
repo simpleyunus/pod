@@ -320,6 +320,28 @@ export class ComplianceService {
 
     const fatigueBreaches = await this.fatigue.breachingDrivers(now);
 
+    // R9 is shared, so overdue actions are listed once on the dashboard
+    // whatever raised them — an incident, an audit finding or a fine.
+    const overdueActionRows = await this.prisma.correctiveAction.findMany({
+      where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, dueDate: { lt: now } },
+      include: {
+        incident: { select: { reference: true } },
+        fine: { select: { noticeNumber: true, reason: true } },
+        auditFinding: { select: { description: true, rtmsElement: true } },
+        driver: { select: { surname: true, firstName: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    // Open audit non-conformances score against the element they were
+    // raised on, so element 8 is not the only place an audit shows up.
+    const openFindings = await this.prisma.auditFinding.findMany({
+      where: {
+        conformity: { in: ['MINOR_NON_CONFORMANCE', 'MAJOR_NON_CONFORMANCE'] },
+        correctiveActions: { some: { status: { in: ['OPEN', 'IN_PROGRESS'] } } },
+      },
+    });
+
     const itemsByElement = (el: RtmsElement) => items.filter((i) => i.kind.rtmsElement === el);
     const countsOf = (subset: typeof items) => ({
       total: subset.length,
@@ -338,6 +360,21 @@ export class ComplianceService {
       const subset = itemsByElement(key);
       const counts = countsOf(subset);
       const itemRag = subset.length ? ragOf(worstOf(subset.map((i) => i.status))) : 'GREEN';
+
+      // An open audit non-conformance colours the element it was raised on.
+      const elementFindings = openFindings.filter((f) => f.rtmsElement === key);
+      if (elementFindings.length) {
+        const major = elementFindings.some((f) => f.conformity === 'MAJOR_NON_CONFORMANCE');
+        findings = [
+          ...findings,
+          {
+            label: `Open audit ${major ? 'major' : 'minor'} non-conformance`,
+            count: elementFindings.length,
+            rag: major ? 'RED' : 'AMBER',
+            link: '/audit',
+          },
+        ];
+      }
       elements.push({
         element: key,
         number: meta.number,
@@ -398,7 +435,7 @@ export class ComplianceService {
     const overdueActions = openActions.filter((a) => a.dueDate && a.dueDate < now);
     push('INCIDENT_MANAGEMENT', [
       { label: 'Open incidents', count: incidents.length, rag: incidents.length ? 'AMBER' : 'GREEN', link: '/incidents' },
-      { label: 'Corrective actions overdue', count: overdueActions.length, rag: overdueActions.length ? 'RED' : 'GREEN', link: '/incidents?filter=overdue' },
+      { label: 'Corrective actions overdue (R9)', count: overdueActionRows.length, rag: overdueActionRows.length ? 'RED' : 'GREEN', link: '/audit?tab=actions' },
       { label: 'Unpaid traffic fines', count: unpaidFines, rag: unpaidFines ? 'AMBER' : 'GREEN', link: '/incidents?tab=fines' },
     ]);
 
@@ -431,6 +468,19 @@ export class ComplianceService {
           blocksOperation: i.kind.requiredForOperation,
         })),
       fatigueBreaches,
+      overdueCorrectiveActions: overdueActionRows.map((a) => ({
+        id: a.id,
+        description: a.description,
+        dueDate: a.dueDate,
+        status: a.status,
+        source: a.sourceType,
+        raisedBy:
+          a.incident?.reference ??
+          a.fine?.noticeNumber ??
+          a.auditFinding?.description?.slice(0, 60) ??
+          (a.driver ? driverName(a.driver) : null),
+        daysOverdue: a.dueDate ? Math.floor((now.getTime() - a.dueDate.getTime()) / DAY_MS) : null,
+      })),
     };
   }
 }

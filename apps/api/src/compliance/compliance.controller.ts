@@ -6,8 +6,10 @@ import { AuditPackService } from './audit-pack.service';
 import { ComplianceService } from './compliance.service';
 import {
   ComplianceItemCreateSchema, ComplianceItemRenewSchema, ComplianceItemUpdateSchema,
+  AuditFindingSchema, AuditSchema, CorrectiveActionCreateSchema,
   DutyRecordSchema, PolicyAckSchema, PolicySchema, RiskAssessmentSchema,
   RouteAckSchema, RouteRiskAssessmentSchema, SafetyObjectiveSchema,
+  TrainingRecordSchema,
 } from './dto';
 import { FatigueService } from './fatigue.service';
 import { GovernanceService } from './governance.service';
@@ -180,6 +182,62 @@ export class ComplianceController {
   @MinRole('ADMIN')
   generateReview(@Body() body: { periodMonth?: string }) {
     return this.reviews.generate(body?.periodMonth);
+  }
+
+  // ── Training (manual 4.14) ───────────────────────────────────────────
+
+  @Get('training/courses')
+  listCourses() {
+    return this.governance.listCourses();
+  }
+
+  @Get('training/records')
+  listTrainingRecords(@Query('driverId') driverId?: string) {
+    return this.governance.listTrainingRecords(driverId);
+  }
+
+  @Post('training/records')
+  @MinRole('CONSULTANT')
+  recordTraining(@Body() body: unknown) {
+    return this.governance.recordTraining(TrainingRecordSchema.parse(body) as any);
+  }
+
+  // ── Internal audit (element 8) ───────────────────────────────────────
+
+  @Get('audits')
+  listAudits() {
+    return this.governance.listAudits();
+  }
+
+  @Post('audits')
+  @MinRole('ADMIN')
+  createAudit(@Body() body: unknown, @CurrentUser() actor: AuthUser) {
+    return this.governance.createAudit(AuditSchema.parse(body), actor.id);
+  }
+
+  @Post('audits/:id/findings')
+  @MinRole('ADMIN')
+  addFinding(@Param('id') id: string, @Body() body: unknown) {
+    return this.governance.addFinding(id, AuditFindingSchema.parse(body));
+  }
+
+  // ── R9 Corrective Action Register ────────────────────────────────────
+
+  @Get('corrective-actions')
+  listCorrectiveActions(
+    @Query('openOnly') openOnly?: string,
+    @Query('overdueOnly') overdueOnly?: string,
+  ) {
+    return this.governance.listCorrectiveActions({
+      openOnly: openOnly === 'true',
+      overdueOnly: overdueOnly === 'true',
+    });
+  }
+
+  @Post('corrective-actions')
+  @MinRole('CONSULTANT')
+  createCorrectiveAction(@Body() body: unknown) {
+    return this.governance.createCorrectiveAction(CorrectiveActionCreateSchema.parse(body));
   }
 
   // ── Audit pack ───────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use client';
 
-import { CameraOutlined, CheckOutlined, CloseOutlined, MinusOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Drawer, Form, Input, InputNumber, Select, Switch, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import api from '../_lib/api';
@@ -8,16 +8,19 @@ import { useAssets, useDrivers, useFleetLookups, useFleetMutation } from '../_li
 
 const { Text } = Typography;
 
-type Outcome = 'PASS' | 'FAIL' | 'NA';
+// P5: "Each item on the checklist will be visually inspected and an X will
+// be marked in either the Yes or No column." The form has two columns, so
+// this control offers two answers — no third 'N/A' state that the paper
+// sheet does not have.
+type Answer = 'YES' | 'NO';
 
 // Mobile-first: the driver does this on a phone at the depot gate at 5am, so
 // the controls are thumb-sized and the whole checklist is one scroll with no
 // horizontal movement and no modal nesting.
-function OutcomeToggle({ value, onChange }: { value: Outcome; onChange: (v: Outcome) => void }) {
-  const opts: { key: Outcome; icon: React.ReactNode; on: string; bg: string }[] = [
-    { key: 'PASS', icon: <CheckOutlined />, on: '#067647', bg: '#E6F6EE' },
-    { key: 'FAIL', icon: <CloseOutlined />, on: '#B42318', bg: '#FEE4E2' },
-    { key: 'NA', icon: <MinusOutlined />, on: '#616875', bg: '#F1F2F0' },
+function AnswerToggle({ value, onChange }: { value: Answer; onChange: (v: Answer) => void }) {
+  const opts: { key: Answer; label: string; icon: React.ReactNode; on: string; bg: string }[] = [
+    { key: 'YES', label: 'Yes', icon: <CheckOutlined />, on: '#067647', bg: '#E6F6EE' },
+    { key: 'NO', label: 'No', icon: <CloseOutlined />, on: '#B42318', bg: '#FEE4E2' },
   ];
   return (
     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -28,9 +31,10 @@ function OutcomeToggle({ value, onChange }: { value: Outcome; onChange: (v: Outc
             key={o.key}
             type="button"
             onClick={() => onChange(o.key)}
-            aria-label={o.key}
+            aria-label={o.label}
             style={{
-              width: 44, height: 44, borderRadius: 11, cursor: 'pointer',
+              minWidth: 58, height: 44, borderRadius: 11, cursor: 'pointer', gap: 6,
+              paddingInline: 10, fontWeight: 600,
               border: active ? `1.5px solid ${o.on}` : '1px solid #E9E9E4',
               background: active ? o.bg : '#fff',
               color: active ? o.on : '#C4C8CE',
@@ -39,6 +43,7 @@ function OutcomeToggle({ value, onChange }: { value: Outcome; onChange: (v: Outc
             }}
           >
             {o.icon}
+            <span style={{ fontSize: 13 }}>{o.label}</span>
           </button>
         );
       })}
@@ -61,7 +66,9 @@ export default function InspectionForm({
   const [driverId, setDriverId] = useState<string>();
   const [odometerKm, setOdometerKm] = useState<number>();
   const [notes, setNotes] = useState('');
-  const [results, setResults] = useState<Record<string, { outcome: Outcome; note?: string; raiseWorkOrder?: boolean }>>({});
+  // P5 requires trip information on the sheet alongside the vehicle details.
+  const [tripInformation, setTripInformation] = useState('');
+  const [results, setResults] = useState<Record<string, { answer: Answer; note?: string; raiseWorkOrder?: boolean }>>({});
 
   const items = lookups?.inspectionItems ?? [];
 
@@ -78,7 +85,7 @@ export default function InspectionForm({
   }, [items]);
 
   const answered = Object.keys(results).length;
-  const failures = Object.values(results).filter((r) => r.outcome === 'FAIL').length;
+  const failures = Object.values(results).filter((r) => r.answer === 'NO').length;
 
   const handleSubmit = () => {
     if (!assetId) return message.warning('Choose a vehicle');
@@ -90,13 +97,14 @@ export default function InspectionForm({
         assignmentId: assignmentId ?? null,
         odometerKm: odometerKm ?? null,
         notes: notes || null,
+        tripInformation: tripInformation || null,
         results: Object.entries(results).map(([itemId, r]) => ({
-          itemId, outcome: r.outcome, note: r.note || null, raiseWorkOrder: !!r.raiseWorkOrder,
+          itemId, answer: r.answer, note: r.note || null, raiseWorkOrder: !!r.raiseWorkOrder,
         })),
       },
       {
         onSuccess: (res: any) => {
-          message.success(res.passed ? 'Inspection passed' : `Inspection recorded — ${failures} failure(s)`);
+          message.success(res.passed ? 'Inspection passed' : `Inspection recorded — ${failures} defect(s) reported to the controller`);
           setResults({}); setNotes(''); setOdometerKm(undefined);
           onClose();
         },
@@ -141,6 +149,9 @@ export default function InspectionForm({
         <Form.Item label="Odometer (km)">
           <InputNumber value={odometerKm} onChange={(v) => setOdometerKm(v ?? undefined)} style={{ width: '100%' }} min={0} />
         </Form.Item>
+        <Form.Item label="Trip information" extra="P5 asks for the trip details on the sheet.">
+          <Input value={tripInformation} onChange={(e) => setTripInformation(e.target.value)} placeholder="Destination, load, trip reference" />
+        </Form.Item>
       </Form>
 
       {grouped.map(([category, list]) => (
@@ -166,17 +177,17 @@ export default function InspectionForm({
                     <Text style={{ fontSize: 14, color: '#171B26' }}>{item.label}</Text>
                     {item.critical && (
                       <div style={{ fontSize: 10, color: '#B42318', fontWeight: 600, marginTop: 2 }}>
-                        CRITICAL — a failure blocks departure
+                        CRITICAL — a "No" here blocks departure
                       </div>
                     )}
                   </div>
-                  <OutcomeToggle
-                    value={r?.outcome ?? ('' as Outcome)}
-                    onChange={(outcome) => setResults((prev) => ({ ...prev, [item.id]: { ...prev[item.id], outcome } }))}
+                  <AnswerToggle
+                    value={r?.answer ?? ('' as Answer)}
+                    onChange={(answer) => setResults((prev) => ({ ...prev, [item.id]: { ...prev[item.id], answer } }))}
                   />
                 </div>
 
-                {r?.outcome === 'FAIL' && (
+                {r?.answer === 'NO' && (
                   <div style={{ marginTop: 10, borderTop: '1px solid #F1F1EC', paddingTop: 10 }}>
                     <Input.TextArea
                       rows={2} placeholder="What is wrong?"

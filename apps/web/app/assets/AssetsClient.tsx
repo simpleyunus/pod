@@ -64,11 +64,15 @@ export default function AssetsClient() {
           scroll={{ x: 'max-content' }}
           onRow={(r: any) => ({ onClick: () => router.push(`/assets/${r.id}`), style: { cursor: 'pointer' } })}
           columns={[
-            { title: 'Fleet no', dataIndex: 'code', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
+            // R1 Fleet List columns, in R1's order.
+            { title: 'No', dataIndex: 'fleetNo', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
+            { title: 'Year model', dataIndex: 'yearModel', render: (v) => v ?? '—' },
+            { title: 'Make / manufacturer', dataIndex: 'makeManufacturer', render: (v) => v ?? '—' },
             { title: 'Registration', dataIndex: 'registrationNo' },
+            { title: 'VIN', dataIndex: 'vin', render: (v) => v ?? '—' },
             { title: 'Type', dataIndex: ['type', 'name'] },
-            { title: 'Make / model', render: (_: any, r: any) => [r.make, r.model].filter(Boolean).join(' ') || '—' },
-            { title: 'Max mass', dataIndex: 'maxMassKg', align: 'right' as const, render: (v) => `${v.toLocaleString()} kg` },
+            { title: 'Max loading mass', dataIndex: 'maxLoadingMassKg', align: 'right' as const, render: (v) => `${(v / 1000).toLocaleString()} t` },
+            { title: 'Max passengers', dataIndex: 'maxPassengers', align: 'right' as const, render: (v) => v ?? 'N/A' },
             { title: 'Odometer', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => `${v.toLocaleString()} km` },
             {
               title: 'Compliance', dataIndex: 'complianceStatus',
@@ -113,11 +117,11 @@ export default function AssetsClient() {
             })
           }
         >
-          <Form.Item name="code" label="Fleet number" rules={[{ required: true }]}>
-            <Input placeholder="POD-T02" />
+          <Form.Item name="fleetNo" label="No (fleet number)" rules={[{ required: true }]}>
+            <Input placeholder="3" />
           </Form.Item>
-          <Form.Item name="registrationNo" label="Registration" rules={[{ required: true }]}>
-            <Input placeholder="JH 56 EF GP" />
+          <Form.Item name="registrationNo" label="Vehicle registration number" rules={[{ required: true }]}>
+            <Input placeholder="MX87GSGP" />
           </Form.Item>
           <Form.Item name="typeId" label="Type" rules={[{ required: true }]}>
             <Select
@@ -126,27 +130,29 @@ export default function AssetsClient() {
             />
           </Form.Item>
           <Form.Item name="vin" label="VIN"><Input /></Form.Item>
+          <Form.Item name="makeManufacturer" label="Make / manufacturer"><Input placeholder="UD TRUCKS" /></Form.Item>
           <Row gutter={12}>
-            <Col span={12}><Form.Item name="make" label="Make"><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="model" label="Model"><Input /></Form.Item></Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={12}><Form.Item name="year" label="Year"><InputNumber style={{ width: '100%' }} min={1970} max={2100} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="yearModel" label="Year model"><InputNumber style={{ width: '100%' }} min={1970} max={2100} /></Form.Item></Col>
             <Col span={12}><Form.Item name="odometerKm" label="Odometer (km)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
           </Row>
           <Row gutter={12}>
-            <Col span={12}><Form.Item name="tareMassKg" label="Tare mass (kg)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
             <Col span={12}>
               <Form.Item
-                name="maxMassKg"
-                label="Permissible max (kg)"
-                rules={[{ required: true, message: 'The gate compares every load against this' }]}
+                name="maxLoadingMassKg"
+                label="Maximum loading mass (kg)"
+                rules={[{ required: true, message: 'Every load is checked against this' }]}
+                extra="R1 shows this in tonnes; enter kilograms."
               >
                 <InputNumber style={{ width: '100%' }} min={1} />
               </Form.Item>
             </Col>
+            <Col span={12}>
+              <Form.Item name="maxPassengers" label="Maximum passengers" extra="Leave blank for N/A.">
+                <InputNumber style={{ width: '100%' }} min={0} />
+              </Form.Item>
+            </Col>
           </Row>
-          <Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="comments" label="Comments"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Drawer>
     </>

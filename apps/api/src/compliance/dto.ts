@@ -119,3 +119,54 @@ export const DutyRecordSchema = z.object({
   breakMinutes: z.number().int().min(0).max(1440).optional(),
   notes: nullableString(500),
 });
+
+// Manual 4.14 / module M1.
+export const TrainingRecordSchema = z.object({
+  courseId: z.string().min(1),
+  driverId: z.string().min(1),
+  completedOn: dateReq,
+  trainerName: nullableString(120),
+  outcome: nullableString(200),
+  certificateFileId: z.string().nullable().optional(),
+  notes: nullableString(1000),
+});
+
+// Internal audit (element 8).
+export const AuditSchema = z.object({
+  scheduledFor: dateReq,
+  conductedOn: dateOpt,
+  auditorName: nullableString(120),
+  scope: nullableString(2000),
+  summary: nullableString(4000),
+});
+
+export const AuditFindingSchema = z.object({
+  rtmsElement: z.enum([
+    'MANAGEMENT_COMMITMENT', 'RISK_MANAGEMENT', 'VEHICLE_FITNESS', 'DRIVER_WELLNESS',
+    'LOAD_MANAGEMENT', 'JOURNEY_MANAGEMENT', 'INCIDENT_MANAGEMENT', 'MONITORING_REVIEW',
+  ]),
+  conformity: z.enum(['CONFORMS', 'MINOR_NON_CONFORMANCE', 'MAJOR_NON_CONFORMANCE', 'OBSERVATION']),
+  description: z.string().min(1).max(4000),
+  evidence: nullableString(2000),
+});
+
+// R9 Corrective Action Register — shared across incident, audit, fine and
+// fatigue sources.
+export const CorrectiveActionCreateSchema = z
+  .object({
+    sourceType: z.enum(['INCIDENT', 'AUDIT_FINDING', 'FINE', 'FATIGUE_BREACH', 'INSPECTION', 'OTHER']),
+    incidentId: z.string().nullable().optional(),
+    auditFindingId: z.string().nullable().optional(),
+    fineId: z.string().nullable().optional(),
+    inspectionId: z.string().nullable().optional(),
+    driverId: z.string().nullable().optional(),
+    description: z.string().min(1).max(2000),
+    ownerUserId: z.string().nullable().optional(),
+    dueDate: dateOpt,
+    notes: nullableString(1000),
+  })
+  .refine(
+    (v) =>
+      v.sourceType !== 'INCIDENT' ? true : !!v.incidentId,
+    { message: 'An INCIDENT action must reference an incident' },
+  );

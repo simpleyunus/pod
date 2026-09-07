@@ -117,7 +117,8 @@ export const footerHtml = (label: string) =>
   `<!doctype html><html><head><style>
      body { font-family: -apple-system, Helvetica, Arial, sans-serif; font-size: 7pt;
             color: #98A0AC; width: 100%; margin: 0 10mm; }
-     .row { display: flex; justify-content: space-between; }
+     .row { display: flex; justify-content: space-between; gap: 12mm; width: 100%; }
+     .row span { white-space: nowrap; }
    </style></head><body><div class="row">
      <span>${escapeHtml(label)}</span>
      <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>

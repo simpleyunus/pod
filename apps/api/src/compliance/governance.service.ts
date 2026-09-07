@@ -145,6 +145,122 @@ export class GovernanceService {
     });
   }
 
+  // ── Training (manual 4.14, module M1) ────────────────────────────────
+  // A completed course with a refresher interval materialises a TRAINING_DUE
+  // ComplianceItem, so refresher expiry runs through the same engine, the
+  // same reminders and the same RAG as a licence.
+
+  listCourses() {
+    return this.prisma.trainingCourse.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: 'asc' },
+      include: { _count: { select: { records: true } } },
+    });
+  }
+
+  listTrainingRecords(driverId?: string) {
+    return this.prisma.trainingRecord.findMany({
+      where: driverId ? { driverId } : {},
+      include: {
+        course: true,
+        driver: { select: { id: true, employeeNo: true, surname: true, firstName: true } },
+      },
+      orderBy: { completedOn: 'desc' },
+    });
+  }
+
+  async recordTraining(data: {
+    courseId: string;
+    driverId: string;
+    completedOn: Date;
+    trainerName?: string | null;
+    outcome?: string | null;
+    certificateFileId?: string | null;
+    notes?: string | null;
+  }) {
+    const course = await this.prisma.trainingCourse.findUnique({ where: { id: data.courseId } });
+    if (!course) throw new NotFoundException('Training course not found');
+
+    const expiresOn = course.refresherMonths
+      ? new Date(new Date(data.completedOn).setMonth(data.completedOn.getMonth() + course.refresherMonths))
+      : null;
+
+    const record = await this.prisma.trainingRecord.create({ data: { ...data, expiresOn } });
+
+    // Mirror into the compliance engine so the refresher shows up beside
+    // licences and medicals rather than in a corner of its own.
+    const kind = await this.prisma.complianceKind.findUnique({ where: { code: 'TRAINING_DUE' } });
+    if (kind && expiresOn) {
+      const existing = await this.prisma.complianceItem.findFirst({
+        where: { driverId: data.driverId, kindId: kind.id, archivedAt: null },
+      });
+      const payload = { reference: course.code, issuedOn: data.completedOn, expiresOn };
+      if (existing) {
+        await this.prisma.complianceItem.update({ where: { id: existing.id }, data: payload });
+      } else {
+        await this.prisma.complianceItem.create({
+          data: { ownerType: 'DRIVER', driverId: data.driverId, kindId: kind.id, ...payload },
+        });
+      }
+    }
+    return record;
+  }
+
+  // ── Internal audit (element 8) ───────────────────────────────────────
+
+  listAudits() {
+    return this.prisma.audit.findMany({
+      orderBy: { scheduledFor: 'desc' },
+      include: { findings: { include: { correctiveActions: true } } },
+    });
+  }
+
+  private async nextAuditReference() {
+    const year = new Date().getFullYear();
+    const count = await this.prisma.audit.count({ where: { reference: { startsWith: `AUD-${year}-` } } });
+    return `AUD-${year}-${String(count + 1).padStart(2, '0')}`;
+  }
+
+  async createAudit(data: any, actorId?: string) {
+    return this.prisma.audit.create({
+      data: { ...data, reference: await this.nextAuditReference(), createdById: actorId },
+      include: { findings: true },
+    });
+  }
+
+  async addFinding(auditId: string, data: any) {
+    const audit = await this.prisma.audit.findUnique({ where: { id: auditId } });
+    if (!audit) throw new NotFoundException('Audit not found');
+    return this.prisma.auditFinding.create({ data: { ...data, auditId } });
+  }
+
+  // ── R9 Corrective Action Register (shared) ───────────────────────────
+  // One register for everything the manual routes here: accident findings,
+  // audit findings, fine trends and fatigue non-compliance.
+
+  listCorrectiveActions(filters: { openOnly?: boolean; overdueOnly?: boolean } = {}) {
+    return this.prisma.correctiveAction.findMany({
+      where: {
+        ...(filters.openOnly && { status: { in: ['OPEN', 'IN_PROGRESS'] } }),
+        ...(filters.overdueOnly && {
+          status: { in: ['OPEN', 'IN_PROGRESS'] },
+          dueDate: { lt: new Date() },
+        }),
+      },
+      include: {
+        incident: { select: { id: true, reference: true } },
+        fine: { select: { id: true, noticeNumber: true, reason: true } },
+        auditFinding: { select: { id: true, description: true, rtmsElement: true } },
+        driver: { select: { id: true, surname: true, firstName: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  createCorrectiveAction(data: any) {
+    return this.prisma.correctiveAction.create({ data });
+  }
+
   // ── Management reviews (element 8) ───────────────────────────────────
 
   listReviews() {

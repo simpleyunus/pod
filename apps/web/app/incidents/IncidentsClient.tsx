@@ -62,13 +62,15 @@ export default function IncidentsClient() {
                   locale={{ emptyText: <Empty description="No incidents recorded" /> }}
                   onRow={(r: any) => ({ onClick: () => setSelected(r.id), style: { cursor: 'pointer' } })}
                   columns={[
+                    // R8 Accident Investigation Register columns.
                     { title: 'Ref', dataIndex: 'reference', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
-                    { title: 'Occurred', dataIndex: 'occurredAt', render: (v) => new Date(v).toLocaleString('en-GB') },
-                    { title: 'Category', dataIndex: ['category', 'name'], render: (v) => v ?? '—' },
-                    { title: 'Vehicle', dataIndex: ['asset', 'code'], render: (v) => v ?? '—' },
-                    { title: 'Driver', dataIndex: ['driver', 'fullName'], render: (v) => v ?? '—' },
-                    { title: 'Location', dataIndex: 'locationText', render: (v) => v ?? '—' },
-                    { title: 'Injuries', dataIndex: 'injuries', align: 'right' as const },
+                    { title: 'Date', dataIndex: 'date', render: (v) => new Date(v).toLocaleString('en-GB') },
+                    { title: 'Vehicle reg no', dataIndex: ['asset', 'registrationNo'], render: (v) => v ?? '—' },
+                    { title: 'Driver name', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
+                    { title: 'Description', dataIndex: 'description', render: (v: string) => v.length > 70 ? `${v.slice(0, 70)}…` : v },
+                    { title: 'Cause', render: (_: any, r: any) => r.systemicCause ?? r.underlyingCause ?? r.cause ?? '—' },
+                    { title: 'Fault', dataIndex: 'faultCategory', render: (v) => v ? String(v).replace(/_/g, ' ').toLowerCase() : '—' },
+                    { title: 'Severity', dataIndex: ['severity', 'name'], render: (v) => v ?? '—' },
                     {
                       title: 'Actions', align: 'right' as const,
                       render: (_: any, r: any) => {
@@ -121,7 +123,7 @@ function ReportIncidentDrawer({ open, onClose }: { open: boolean; onClose: () =>
       }
       await create.mutateAsync({
         ...values,
-        occurredAt: values.occurredAt.toISOString(),
+        date: values.date.toISOString(),
         photoFileIds,
       });
       message.success('Incident reported');
@@ -148,13 +150,34 @@ function ReportIncidentDrawer({ open, onClose }: { open: boolean; onClose: () =>
         </div>
       }
     >
-      <Form form={form} layout="vertical" size="large" onFinish={submit} initialValues={{ occurredAt: dayjs(), injuries: 0 }}>
-        <Form.Item name="occurredAt" label="When" rules={[{ required: true }]}>
+      <Form form={form} layout="vertical" size="large" onFinish={submit} initialValues={{ date: dayjs(), injuries: 0 }}>
+        <Form.Item name="date" label="When" rules={[{ required: true }]}>
           <DatePicker showTime style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="categoryId" label="What happened">
           <Select allowClear placeholder="Category"
             options={(lookups?.incidentCategories ?? []).map((c: any) => ({ value: c.id, label: c.name }))} />
+        </Form.Item>
+        {/* P3: categorised by severity and by fault. */}
+        <Form.Item name="severityId" label="Severity">
+          <Select allowClear
+            options={(lookups?.incidentSeverities ?? []).map((c: any) => ({ value: c.id, label: c.name }))} />
+        </Form.Item>
+        <Form.Item name="faultCategory" label="Fault">
+          <Select allowClear options={[
+            { value: 'DRIVER_FAULT', label: 'Driver fault' },
+            { value: 'THIRD_PARTY_FAULT', label: 'Third party fault' },
+            { value: 'SHARED', label: 'Shared' },
+            { value: 'UNDETERMINED', label: 'Undetermined' },
+          ]} />
+        </Form.Item>
+        <Form.Item name="isNearMiss" label="Near miss" valuePropName="checked"
+          extra="The manual asks drivers to report near misses so they can be used as learning.">
+          <Switch />
+        </Form.Item>
+        <Form.Item name="sapsReportNumber" label="SAPS accident report number"
+          extra="P3: report to the nearest SAPS station within 24 hours and obtain a number.">
+          <Input />
         </Form.Item>
         <Form.Item name="description" label="Description" rules={[{ required: true }]}>
           <Input.TextArea rows={4} placeholder="What happened, in the reporter's own words" />
@@ -218,9 +241,9 @@ function IncidentDetail({ id, onClose }: { id: string | null; onClose: () => voi
                 <>
                   <Text style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>{incident.description}</Text>
                   <Row gutter={12} style={{ fontSize: 12, color: '#616875' }}>
-                    <Col span={8}>Occurred: {new Date(incident.occurredAt).toLocaleString('en-GB')}</Col>
-                    <Col span={8}>Vehicle: {incident.asset?.code ?? '—'}</Col>
-                    <Col span={8}>Driver: {incident.driver?.fullName ?? '—'}</Col>
+                    <Col span={8}>Date: {new Date(incident.date).toLocaleString('en-GB')}</Col>
+                    <Col span={8}>Vehicle: {incident.asset?.registrationNo ?? '—'}</Col>
+                    <Col span={8}>Driver: {incident.driver ? `${incident.driver.firstName} ${incident.driver.surname}` : '—'}</Col>
                   </Row>
                 </>
               ),
@@ -365,14 +388,16 @@ function FinesTab() {
         rowKey="id" loading={isLoading} dataSource={data} pagination={{ pageSize: 20, hideOnSinglePage: true }}
         scroll={{ x: 'max-content' }} locale={{ emptyText: 'No traffic fines recorded' }}
         columns={[
+          // R10 Traffic Fine Register columns — the form carries no amount.
+          { title: 'Date', dataIndex: 'date', render: (v) => fmtDate(v) },
+          { title: 'Vehicle reg no', dataIndex: ['asset', 'registrationNo'], render: (v) => v ?? '—' },
+          { title: 'Driver name', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
+          { title: 'Reason for the traffic fine', dataIndex: 'reason' },
+          {
+            title: 'Corrective actions taken', dataIndex: 'correctiveActionsTaken',
+            render: (v) => v ?? <RagTag status="AMBER" label="none recorded" size="sm" />,
+          },
           { title: 'Notice', dataIndex: 'noticeNumber', render: (v) => v ?? '—' },
-          { title: 'Issued', dataIndex: 'issuedOn', render: (v) => fmtDate(v) },
-          { title: 'Vehicle', dataIndex: ['asset', 'code'], render: (v) => v ?? '—' },
-          { title: 'Driver', dataIndex: ['driver', 'fullName'], render: (v) => v ?? '—' },
-          { title: 'Reason', dataIndex: 'reason' },
-          { title: 'Amount', align: 'right' as const, render: (_: any, r: any) => `${r.currency} ${Number(r.amount).toLocaleString()}` },
-          { title: 'Status', dataIndex: 'status', render: (v) => <RagTag status={v === 'PAID' ? 'GREEN' : v === 'UNPAID' ? 'AMBER' : 'NEUTRAL'} label={v} /> },
-          { title: 'Corrective action', dataIndex: 'correctiveAction', render: (v) => v ?? '—' },
         ]}
       />
     </Card>

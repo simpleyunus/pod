@@ -245,15 +245,24 @@ const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
 
 export async function seedRtms(prisma: PrismaClient) {
   // ── Lookups ──────────────────────────────────────────────────────────
+  // These lookups carry vocabulary straight out of the toolkit (R1's vehicle
+  // types, the register names on R2/R15/R16), so the document is authoritative
+  // and the seed asserts `name`. A stale name from an earlier seed otherwise
+  // prints into the register and stops matching POD's paperwork.
   for (const [i, t] of ASSET_TYPES.entries()) {
-    await prisma.assetType.upsert({ where: { code: t.code }, update: { sortOrder: i }, create: { ...t, sortOrder: i } });
+    await prisma.assetType.upsert({
+      where: { code: t.code },
+      update: { sortOrder: i, name: t.name, isTrailer: t.isTrailer },
+      create: { ...t, sortOrder: i },
+    });
   }
   for (const [i, k] of COMPLIANCE_KINDS.entries()) {
     await prisma.complianceKind.upsert({
       where: { code: k.code },
-      // Behavioural flags are re-asserted each seed; `name` is left alone so
-      // an admin rename survives.
-      update: { sortOrder: i, ownerType: k.ownerType, requiredForOperation: k.requiredForOperation, rtmsElement: k.rtmsElement },
+      update: {
+        sortOrder: i, name: k.name, ownerType: k.ownerType,
+        requiredForOperation: k.requiredForOperation, rtmsElement: k.rtmsElement,
+      },
       create: { ...k, sortOrder: i },
     });
   }
