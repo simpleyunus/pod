@@ -320,6 +320,34 @@ export class ComplianceService {
 
     const fatigueBreaches = await this.fatigue.breachingDrivers(now);
 
+    // A required document with no record at all is unevidenced, which reads
+    // the same as expired to an auditor. Counting only the items that exist
+    // would let a vehicle with no Certificate of Fitness score green — and
+    // would contradict the asset list, which already scores it red.
+    const requiredKinds = await this.prisma.complianceKind.findMany({
+      where: { requiredForOperation: true, active: true },
+    });
+    const [allAssets, allDrivers] = await Promise.all([
+      this.prisma.asset.findMany({
+        where: { active: true },
+        select: { id: true, complianceItems: { where: { archivedAt: null }, select: { kindId: true } } },
+      }),
+      this.prisma.driver.findMany({
+        where: { active: true },
+        select: { id: true, complianceItems: { where: { archivedAt: null }, select: { kindId: true } } },
+      }),
+    ]);
+    // How many owner/document pairs are simply not on file, per element.
+    const missingByElement = new Map<RtmsElement, number>();
+    for (const kind of requiredKinds) {
+      if (!kind.rtmsElement) continue;
+      const owners = kind.ownerType === 'ASSET' ? allAssets : allDrivers;
+      const missing = owners.filter((o) => !o.complianceItems.some((i) => i.kindId === kind.id)).length;
+      if (missing) {
+        missingByElement.set(kind.rtmsElement, (missingByElement.get(kind.rtmsElement) ?? 0) + missing);
+      }
+    }
+
     // R9 is shared, so overdue actions are listed once on the dashboard
     // whatever raised them — an incident, an audit finding or a fine.
     const overdueActionRows = await this.prisma.correctiveAction.findMany({
@@ -360,6 +388,19 @@ export class ComplianceService {
       const subset = itemsByElement(key);
       const counts = countsOf(subset);
       const itemRag = subset.length ? ragOf(worstOf(subset.map((i) => i.status))) : 'GREEN';
+
+      const missing = missingByElement.get(key) ?? 0;
+      if (missing) {
+        findings = [
+          ...findings,
+          {
+            label: 'Required documents with no record on file',
+            count: missing,
+            rag: 'RED',
+            link: '/compliance?tab=items',
+          },
+        ];
+      }
 
       // An open audit non-conformance colours the element it was raised on.
       const elementFindings = openFindings.filter((f) => f.rtmsElement === key);

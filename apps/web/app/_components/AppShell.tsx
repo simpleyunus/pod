@@ -3,6 +3,7 @@
 import {
   AlertOutlined,
   AppstoreOutlined,
+  AuditOutlined,
   BarChartOutlined,
   IdcardOutlined,
   ImportOutlined,
@@ -89,6 +90,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { key: '/maintenance', icon: <ToolOutlined />, label: 'Maintenance' },
     { key: '/trips', icon: <AppstoreOutlined />, label: 'Trips' },
     { key: '/incidents', icon: <AlertOutlined />, label: 'Incidents' },
+    { key: '/audit', icon: <AuditOutlined />, label: 'Audit' },
   ];
 
   // Longest match wins, so /fleet does not swallow other routes.

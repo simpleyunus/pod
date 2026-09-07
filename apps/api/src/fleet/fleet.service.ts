@@ -8,7 +8,20 @@ import { driverName } from './naming';
 // how many valid ones it has.
 const RANK: Record<ComplianceStatus, number> = { VALID: 0, DUE_SOON: 1, EXPIRED: 2 };
 
-export function rollUp(items: { status: ComplianceStatus }[]): ComplianceStatus {
+/**
+ * Roll a set of compliance items up to one status.
+ *
+ * `missingRequired` is the count of documents an admin has marked
+ * `requiredForOperation` that have no record at all. Those score as EXPIRED,
+ * because a vehicle with no Certificate of Fitness on file is not compliant —
+ * it is unevidenced, which is the same answer to an auditor. Without this a
+ * brand-new asset with zero documents would read green.
+ */
+export function rollUp(
+  items: { status: ComplianceStatus }[],
+  missingRequired = 0,
+): ComplianceStatus {
+  if (missingRequired > 0) return 'EXPIRED';
   return items.reduce<ComplianceStatus>(
     (worst, i) => (RANK[i.status] > RANK[worst] ? i.status : worst),
     'VALID',
@@ -38,31 +51,43 @@ export class FleetService {
       }),
     };
 
-    const assets = await this.prisma.asset.findMany({
-      where,
-      orderBy: { fleetNo: 'asc' },
-      include: {
-        type: true,
-        complianceItems: {
-          where: { archivedAt: null },
-          include: { kind: { select: { code: true, name: true, requiredForOperation: true } } },
+    const [assets, requiredKinds] = await Promise.all([
+      this.prisma.asset.findMany({
+        where,
+        orderBy: { fleetNo: 'asc' },
+        include: {
+          type: true,
+          complianceItems: {
+            where: { archivedAt: null },
+            include: { kind: { select: { code: true, name: true, requiredForOperation: true } } },
+          },
         },
-      },
-    });
+      }),
+      this.prisma.complianceKind.findMany({
+        where: { ownerType: 'ASSET', requiredForOperation: true, active: true },
+        select: { code: true, name: true },
+      }),
+    ]);
 
     return assets.map((a) => {
       const { complianceItems, ...rest } = a;
+      const held = new Set(complianceItems.map((i) => i.kind.code));
+      const missing = requiredKinds.filter((k) => !held.has(k.code));
       return {
         ...rest,
-        complianceStatus: rollUp(complianceItems),
+        missingRequired: missing.map((k) => k.name),
+        complianceStatus: rollUp(complianceItems, missing.length),
         complianceCounts: {
           VALID: complianceItems.filter((i) => i.status === 'VALID').length,
           DUE_SOON: complianceItems.filter((i) => i.status === 'DUE_SOON').length,
           EXPIRED: complianceItems.filter((i) => i.status === 'EXPIRED').length,
         },
-        blockingItems: complianceItems
-          .filter((i) => i.kind.requiredForOperation && i.status === 'EXPIRED')
-          .map((i) => i.kind.name),
+        blockingItems: [
+          ...complianceItems
+            .filter((i) => i.kind.requiredForOperation && i.status === 'EXPIRED')
+            .map((i) => i.kind.name),
+          ...missing.map((k) => `${k.name} (no record)`),
+        ],
       };
     });
   }
@@ -139,39 +164,51 @@ export class FleetService {
   // ── Drivers ──────────────────────────────────────────────────────────
 
   async listDrivers(opts: { q?: string; includeInactive?: boolean } = {}) {
-    const drivers = await this.prisma.driver.findMany({
-      where: {
-        ...(opts.includeInactive ? {} : { active: true }),
-        ...(opts.q && {
-          OR: [
-            { surname: { contains: opts.q, mode: 'insensitive' } },
-            { firstName: { contains: opts.q, mode: 'insensitive' } },
-            { employeeNo: { contains: opts.q, mode: 'insensitive' } },
-          ],
-        }),
-      },
-      orderBy: [{ surname: 'asc' }, { firstName: 'asc' }],
-      include: {
-        complianceItems: {
-          where: { archivedAt: null },
-          include: { kind: { select: { code: true, name: true, requiredForOperation: true } } },
+    const [drivers, requiredKinds] = await Promise.all([
+      this.prisma.driver.findMany({
+        where: {
+          ...(opts.includeInactive ? {} : { active: true }),
+          ...(opts.q && {
+            OR: [
+              { surname: { contains: opts.q, mode: 'insensitive' } },
+              { firstName: { contains: opts.q, mode: 'insensitive' } },
+              { employeeNo: { contains: opts.q, mode: 'insensitive' } },
+            ],
+          }),
         },
-      },
-    });
+        orderBy: [{ surname: 'asc' }, { firstName: 'asc' }],
+        include: {
+          complianceItems: {
+            where: { archivedAt: null },
+            include: { kind: { select: { code: true, name: true, requiredForOperation: true } } },
+          },
+        },
+      }),
+      this.prisma.complianceKind.findMany({
+        where: { ownerType: 'DRIVER', requiredForOperation: true, active: true },
+        select: { code: true, name: true },
+      }),
+    ]);
 
     return drivers.map((d) => {
       const { complianceItems, ...rest } = d;
+      const held = new Set(complianceItems.map((i) => i.kind.code));
+      const missing = requiredKinds.filter((k) => !held.has(k.code));
       return {
         ...rest,
-        complianceStatus: rollUp(complianceItems),
+        missingRequired: missing.map((k) => k.name),
+        complianceStatus: rollUp(complianceItems, missing.length),
         complianceCounts: {
           VALID: complianceItems.filter((i) => i.status === 'VALID').length,
           DUE_SOON: complianceItems.filter((i) => i.status === 'DUE_SOON').length,
           EXPIRED: complianceItems.filter((i) => i.status === 'EXPIRED').length,
         },
-        blockingItems: complianceItems
-          .filter((i) => i.kind.requiredForOperation && i.status === 'EXPIRED')
-          .map((i) => i.kind.name),
+        blockingItems: [
+          ...complianceItems
+            .filter((i) => i.kind.requiredForOperation && i.status === 'EXPIRED')
+            .map((i) => i.kind.name),
+          ...missing.map((k) => `${k.name} (no record)`),
+        ],
       };
     });
   }

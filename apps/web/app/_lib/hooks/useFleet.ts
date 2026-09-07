@@ -187,3 +187,53 @@ export function useFleetMutation<T = any>(fn: (vars: T) => Promise<any>, keys: s
     },
   });
 }
+
+// ── Governance: audit, training and the shared R9 register ─────────────
+
+export function useAudits() {
+  return useQuery({
+    queryKey: ['compliance', 'audits'],
+    queryFn: () => api.get('/api/compliance/audits').then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useCorrectiveActions(params: { openOnly?: boolean; overdueOnly?: boolean } = {}) {
+  return useQuery({
+    queryKey: ['compliance', 'corrective-actions', params],
+    queryFn: () =>
+      api.get('/api/compliance/corrective-actions', {
+        params: {
+          ...(params.openOnly ? { openOnly: 'true' } : {}),
+          ...(params.overdueOnly ? { overdueOnly: 'true' } : {}),
+        },
+      }).then((r) => r.data),
+    staleTime: 15_000,
+  });
+}
+
+export function useTrainingCourses() {
+  return useQuery({
+    queryKey: ['compliance', 'training', 'courses'],
+    queryFn: () => api.get('/api/compliance/training/courses').then((r) => r.data),
+    staleTime: Infinity,
+  });
+}
+
+export function useTrainingRecords(driverId?: string) {
+  return useQuery({
+    queryKey: ['compliance', 'training', 'records', driverId ?? null],
+    queryFn: () =>
+      api.get('/api/compliance/training/records', { params: driverId ? { driverId } : {} })
+        .then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useReviews() {
+  return useQuery({
+    queryKey: ['compliance', 'reviews'],
+    queryFn: () => api.get('/api/compliance/reviews').then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
