@@ -12,17 +12,35 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 @Injectable()
 export class StorageService implements OnModuleInit {
   private s3: S3Client;
+  // Second client used ONLY to sign download URLs. In production the API
+  // reaches MinIO at http://minio:9000 on the compose network, but a browser
+  // cannot resolve that host — a URL signed against it is undownloadable.
+  // A SigV4 signature covers the Host header, so the public host cannot be
+  // patched into the string afterwards; it has to be signed with. Where the
+  // two are the same (development) this is the same endpoint and costs
+  // nothing.
+  private s3Public: S3Client;
 
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit() {
+    const credentials = {
+      accessKeyId: this.config.get('S3_ACCESS_KEY', 'pod'),
+      secretAccessKey: this.config.get('S3_SECRET_KEY', 'minio_dev_password'),
+    };
+    const internal = this.config.get('S3_ENDPOINT', 'http://localhost:9000');
+    const external = this.config.get('S3_PUBLIC_ENDPOINT', internal);
+
     this.s3 = new S3Client({
-      endpoint: this.config.get('S3_ENDPOINT', 'http://localhost:9000'),
+      endpoint: internal,
       region: 'us-east-1',
-      credentials: {
-        accessKeyId: this.config.get('S3_ACCESS_KEY', 'pod'),
-        secretAccessKey: this.config.get('S3_SECRET_KEY', 'minio_dev_password'),
-      },
+      credentials,
+      forcePathStyle: true,
+    });
+    this.s3Public = new S3Client({
+      endpoint: external,
+      region: 'us-east-1',
+      credentials,
       forcePathStyle: true,
     });
   }
@@ -43,9 +61,10 @@ export class StorageService implements OnModuleInit {
     return { bucket, key };
   }
 
+  /** A link the BROWSER can follow — signed against the public endpoint. */
   async getPresignedUrl(bucket: string, key: string, expiresIn = 3600) {
     const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
-    return getSignedUrl(this.s3, cmd, { expiresIn });
+    return getSignedUrl(this.s3Public, cmd, { expiresIn });
   }
 
   async getObject(bucket: string, key: string): Promise<Buffer> {

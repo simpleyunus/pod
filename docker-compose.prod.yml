@@ -55,6 +55,11 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
     volumes:
       - miniodata:/data
+    ports:
+      # S3 API only, bound to loopback: a reverse proxy or tunnel on this
+      # machine publishes it as S3_PUBLIC_ENDPOINT. The :9001 console is
+      # deliberately NOT published.
+      - "127.0.0.1:9000:9000"
 
   meilisearch:
     image: getmeili/meilisearch:v1.12
@@ -72,6 +77,12 @@ services:
     volumes:
       - clamdb:/var/lib/clamav
 
+  # Renders the RTMS register set (R1-R17) to PDF for the audit pack.
+  # Internal only: nothing outside the compose network needs to reach it.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+
   api:
     build: ./apps/api
     restart: unless-stopped
@@ -79,6 +90,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_started
+      gotenberg:
         condition: service_started
     environment:
       NODE_ENV: production
@@ -90,6 +103,9 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:?set in .env}
       # MinIO / S3
       S3_ENDPOINT: http://minio:9000
+      # Where the BROWSER reaches MinIO. Download links are signed against
+      # this, so it must be publicly resolvable — see DEPLOY.md.
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:?set in .env}
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       S3_BUCKET_MEDIA: ${S3_BUCKET_MEDIA:-pod-media}
@@ -99,6 +115,10 @@ services:
       # ClamAV
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
+      # Gotenberg — PDF rendering for the RTMS audit pack. Inside the compose
+      # network it listens on 3000; the dev default is localhost:3001, which
+      # would resolve to nothing inside this container.
+      GOTENBERG_URL: http://gotenberg:3000
       # WhatsApp — flip WHATSAPP_MODE to "meta" when credentials arrive
       WHATSAPP_MODE: ${WHATSAPP_MODE:-log}
       WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
