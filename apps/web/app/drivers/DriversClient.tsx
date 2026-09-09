@@ -4,7 +4,7 @@ import { IdcardOutlined, PlusOutlined, TeamOutlined, WarningOutlined } from '@an
 import {
   Button, Card, Col, Drawer, Empty, Form, Input, Modal, Row, Table, Tabs, Typography, message,
 } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../_lib/api';
 import { hasRole } from '../_lib/auth';
 import { useDriver, useDrivers, useFleetMutation } from '../_lib/hooks/useFleet';
@@ -17,6 +17,15 @@ export default function DriversClient() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+
+  // Deep link: /drivers?id=<driverId> opens that driver straight away, so a
+  // driver name in the trips or incidents table is a real jump rather than a
+  // dump on the list. Read from window rather than useSearchParams, which
+  // would need a Suspense boundary around a page that is otherwise static.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (id) setSelected(id);
+  }, []);
   const [form] = Form.useForm();
   const { data: drivers = [], isLoading } = useDrivers(q ? { q } : {});
   const canEdit = hasRole('CONSULTANT');
@@ -106,7 +115,15 @@ export default function DriversClient() {
         </Form>
       </Drawer>
 
-      <DriverDetail id={selected} onClose={() => setSelected(null)} />
+      <DriverDetail
+        id={selected}
+        onClose={() => {
+          setSelected(null);
+          if (new URLSearchParams(window.location.search).get('id')) {
+            window.history.replaceState({}, '', '/drivers');
+          }
+        }}
+      />
     </>
   );
 }

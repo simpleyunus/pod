@@ -2,8 +2,8 @@
 
 import {
   AlertOutlined,
-  AppstoreOutlined,
   AuditOutlined,
+  CarOutlined,
   BarChartOutlined,
   IdcardOutlined,
   ImportOutlined,
@@ -11,6 +11,7 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  NodeIndexOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
   ToolOutlined,
@@ -72,8 +73,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.replace('/login');
   };
 
-  const menuItems = [
-    { key: '/fleet', icon: <AppstoreOutlined />, label: 'Fleet' },
+  // Two groups, labelled. The distinction matters and is not guessable from
+  // the names: the sales side tracks customers' cars being imported, the RTMS
+  // side tracks POD's own trucks and the compliance evidence around them.
+  //
+  // "Deals" is the label rather than "Fleet" because the route /fleet predates
+  // the RTMS module and now sits confusingly next to Vehicles. Renaming the
+  // label costs nothing and stops the two reading as the same thing; the URL
+  // is left alone so existing links keep working.
+  const salesItems = [
+    { key: '/fleet', icon: <CarOutlined />, label: 'Deals' },
     { key: '/reports', icon: <BarChartOutlined />, label: 'Reports' },
     ...(hasRole('ADMIN', user)
       ? [
@@ -81,22 +90,37 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           { key: '/team', icon: <TeamOutlined />, label: 'Team' },
         ]
       : []),
-    // RTMS Fleet & Compliance. Grouped so the deals board above stays the
-    // primary surface — these are POD's own trucks, not customers' cars.
-    { type: 'divider' as const, key: 'rtms-divider', style: { margin: '10px 14px', background: 'rgba(255,255,255,0.07)' } },
+  ];
+
+  const rtmsItems = [
     { key: '/compliance', icon: <SafetyCertificateOutlined />, label: 'Compliance' },
-    { key: '/assets', icon: <TruckOutlined />, label: 'Assets' },
+    { key: '/assets', icon: <TruckOutlined />, label: 'Vehicles' },
     { key: '/drivers', icon: <IdcardOutlined />, label: 'Drivers' },
     { key: '/maintenance', icon: <ToolOutlined />, label: 'Maintenance' },
-    { key: '/trips', icon: <AppstoreOutlined />, label: 'Trips' },
+    { key: '/trips', icon: <NodeIndexOutlined />, label: 'Trips' },
     { key: '/incidents', icon: <AlertOutlined />, label: 'Incidents' },
     { key: '/audit', icon: <AuditOutlined />, label: 'Audit' },
   ];
 
-  // Longest match wins, so /fleet does not swallow other routes.
+  const groupLabel = (text: string) => (
+    <span style={{
+      fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
+      color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase',
+    }}>
+      {text}
+    </span>
+  );
+
+  const menuItems = collapsed
+    ? [...salesItems, { type: 'divider' as const, key: 'd' }, ...rtmsItems]
+    : [
+        { type: 'group' as const, key: 'g-sales', label: groupLabel('Sales'), children: salesItems },
+        { type: 'group' as const, key: 'g-rtms', label: groupLabel('RTMS compliance'), children: rtmsItems },
+      ];
+
+  // Longest match wins, so /fleet does not swallow the other routes.
   const selectedKey =
-    menuItems
-      .filter((m): m is { key: string; icon: any; label: string } => 'label' in m)
+    [...salesItems, ...rtmsItems]
       .filter((m) => pathname === m.key || pathname.startsWith(m.key + '/'))
       .sort((a, b) => b.key.length - a.key.length)[0]?.key ?? '/fleet';
 

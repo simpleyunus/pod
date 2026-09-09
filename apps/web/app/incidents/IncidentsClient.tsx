@@ -14,6 +14,7 @@ import {
 } from '../_lib/hooks/useFleet';
 import { useUsers } from '../_lib/hooks/useReference';
 import RagTag, { KpiCard, PageHeader } from '../_components/RagTag';
+import RecordLink from '../_components/RecordLink';
 
 const { Text } = Typography;
 const fmtDate = (d?: string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
@@ -65,8 +66,22 @@ export default function IncidentsClient() {
                     // R8 Accident Investigation Register columns.
                     { title: 'Ref', dataIndex: 'reference', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
                     { title: 'Date', dataIndex: 'date', render: (v) => new Date(v).toLocaleString('en-GB') },
-                    { title: 'Vehicle reg no', dataIndex: ['asset', 'registrationNo'], render: (v) => v ?? '—' },
-                    { title: 'Driver name', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
+                    {
+                      title: 'Vehicle reg no',
+                      render: (_: any, r: any) => (
+                        <RecordLink href={r.asset ? `/assets/${r.asset.id}` : null}>
+                          {r.asset?.registrationNo}
+                        </RecordLink>
+                      ),
+                    },
+                    {
+                      title: 'Driver name',
+                      render: (_: any, r: any) => (
+                        <RecordLink href={r.driver ? `/drivers?id=${r.driver.id}` : null}>
+                          {r.driver ? `${r.driver.firstName} ${r.driver.surname}` : null}
+                        </RecordLink>
+                      ),
+                    },
                     { title: 'Description', dataIndex: 'description', render: (v: string) => v.length > 70 ? `${v.slice(0, 70)}…` : v },
                     { title: 'Cause', render: (_: any, r: any) => r.systemicCause ?? r.underlyingCause ?? r.cause ?? '—' },
                     { title: 'Fault', dataIndex: 'faultCategory', render: (v) => v ? String(v).replace(/_/g, ' ').toLowerCase() : '—' },

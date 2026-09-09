@@ -91,3 +91,10 @@ body {
   border-radius: 99px;
   background: var(--signal);
 }
+
+/* Cross-record links inside tables: invisible until hovered, so a dense
+   table does not turn into a wall of blue, but discoverable on approach. */
+.pod-record-link:hover {
+  color: var(--signal) !important;
+  border-bottom-color: var(--signal) !important;
+}

@@ -12,6 +12,7 @@ import {
   useAssets, useFleetMutation, useInspections, useMaintenanceOverview, useWorkOrders,
 } from '../_lib/hooks/useFleet';
 import RagTag, { KpiCard, PageHeader } from '../_components/RagTag';
+import RecordLink from '../_components/RecordLink';
 import InspectionForm from './InspectionForm';
 
 const { Text } = Typography;
@@ -71,8 +72,8 @@ export default function MaintenanceClient() {
                   locale={{ emptyText: 'No maintenance plans configured' }}
                   columns={[
                     // R11 Vehicle Maintenance Schedule columns.
-                    { title: 'Fleet nr', render: (_: any, r: any) => <Text strong style={{ fontSize: 13 }}>{r.fleetNo}</Text> },
-                    { title: 'Vehicle reg no', dataIndex: 'registrationNo' },
+                    { title: 'Fleet nr', render: (_: any, r: any) => <RecordLink href={`/assets/${r.assetId}`}><Text strong style={{ fontSize: 13 }}>{r.fleetNo}</Text></RecordLink> },
+                    { title: 'Vehicle reg no', render: (_: any, r: any) => <RecordLink href={`/assets/${r.assetId}`} muted>{r.registrationNo}</RecordLink> },
                     { title: 'Plan', dataIndex: 'name' },
                     { title: 'Kilometres now', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => `${v.toLocaleString()} km` },
                     { title: 'Next service due (km)', dataIndex: 'nextDueOdoKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
@@ -123,7 +124,7 @@ function WorkOrdersTab() {
         locale={{ emptyText: 'No work orders yet' }}
         columns={[
           { title: 'Job no', dataIndex: 'number', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
-          { title: 'Vehicle', dataIndex: ['asset', 'fleetNo'] },
+          { title: 'Vehicle', render: (_: any, r: any) => <RecordLink href={`/assets/${r.asset.id}`}>{r.asset.fleetNo} · {r.asset.registrationNo}</RecordLink> },
           { title: 'Title', dataIndex: 'title' },
           { title: 'Raised', dataIndex: 'requestedAt', render: (v) => fmtDate(v) },
           {
@@ -187,7 +188,7 @@ function InspectionsTab() {
         }}
         columns={[
           { title: 'Performed', dataIndex: 'performedAt', render: (v) => new Date(v).toLocaleString('en-GB') },
-          { title: 'Vehicle', dataIndex: ['asset', 'fleetNo'] },
+          { title: 'Vehicle', render: (_: any, r: any) => <RecordLink href={`/assets/${r.asset.id}`}>{r.asset.fleetNo} · {r.asset.registrationNo}</RecordLink> },
           { title: 'Driver', render: (_: any, r: any) => r.driver ? `${r.driver.firstName} ${r.driver.surname}` : '—' },
           { title: 'Odometer', dataIndex: 'odometerKm', align: 'right' as const, render: (v) => v ? `${v.toLocaleString()} km` : '—' },
           { title: 'Result', dataIndex: 'passed', render: (v) => <RagTag status={v ? 'PASS' : 'FAIL'} label={v ? 'Pass' : 'Defect'} /> },

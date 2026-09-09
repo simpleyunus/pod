@@ -2,10 +2,19 @@
 
 import { SearchOutlined } from '@ant-design/icons';
 import { AutoComplete, Input, Spin } from 'antd';
+import type { DefaultOptionType } from 'antd/es/select';
 import type { InputRef } from 'antd';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import api from '../_lib/api';
+
+interface FleetHit {
+  type: string;
+  id: string;
+  href: string;
+  title: string;
+  subtitle?: string;
+}
 
 interface Hit {
   id: string;
@@ -23,6 +32,9 @@ export default function GlobalSearch() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [value, setValue] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
+  // Fleet records — vehicles, drivers, trips, incidents — which Meilisearch
+  // does not index.
+  const [fleetHits, setFleetHits] = useState<FleetHit[]>([]);
   const [busy, setBusy] = useState(false);
   const [kbdHint, setKbdHint] = useState('');
 
@@ -45,22 +57,30 @@ export default function GlobalSearch() {
   const onSearch = (q: string) => {
     setValue(q);
     if (timer.current) clearTimeout(timer.current);
-    if (!q.trim()) { setHits([]); setBusy(false); return; }
+    if (!q.trim()) { setHits([]); setFleetHits([]); setBusy(false); return; }
     setBusy(true);
     timer.current = setTimeout(async () => {
       try {
-        const { data } = await api.get('/api/search', { params: { q } });
-        setHits(data.hits ?? []);
+        // Two sources: Meilisearch for deals, and a direct query for the
+        // fleet records it does not index. Settled independently so a
+        // Meilisearch outage still lets you find a vehicle.
+        const [deals, fleet] = await Promise.allSettled([
+          api.get('/api/search', { params: { q } }),
+          api.get('/api/fleet/quick-find', { params: { q } }),
+        ]);
+        setHits(deals.status === 'fulfilled' ? deals.value.data.hits ?? [] : []);
+        setFleetHits(fleet.status === 'fulfilled' ? fleet.value.data ?? [] : []);
       } catch {
         setHits([]);
+        setFleetHits([]);
       } finally {
         setBusy(false);
       }
     }, 220);
   };
 
-  const options = hits.map((h) => ({
-    value: h.id,
+  const dealOptions = hits.map((h) => ({
+    value: `deal:${h.id}`,
     label: (
       <div style={{ padding: '5px 2px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
@@ -84,6 +104,46 @@ export default function GlobalSearch() {
       </div>
     ),
   }));
+
+  // Vehicles, drivers, trips and incidents — the half of the app Meilisearch
+  // does not index.
+  const fleetOptions = fleetHits.map((h) => ({
+    value: `go:${h.href}`,
+    label: (
+      <div style={{ padding: '5px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#171B26' }}>{h.title}</span>
+          {h.subtitle && (
+            <span style={{ fontSize: 11.5, color: '#616875', marginLeft: 8 }}>{h.subtitle}</span>
+          )}
+        </span>
+        <span style={{
+          fontSize: 9.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+          color: '#3A4150', background: '#F1F2F0', borderRadius: 5, padding: '2px 7px', flexShrink: 0,
+        }}>
+          {h.type}
+        </span>
+      </div>
+    ),
+  }));
+
+  const groupHeading = (text: string) => (
+    <span style={{
+      fontSize: 9.5, fontWeight: 700, letterSpacing: '.1em',
+      textTransform: 'uppercase', color: '#98A0AC',
+    }}>{text}</span>
+  );
+
+  // Only show headings when both kinds are present; a single group needs no label.
+  // Typed explicitly: antd's options prop accepts either a flat list or
+  // groups, and TypeScript will not infer the union on its own.
+  const options: DefaultOptionType[] =
+    dealOptions.length && fleetOptions.length
+      ? [
+          { label: groupHeading('Deals'), options: dealOptions },
+          { label: groupHeading('Fleet & compliance'), options: fleetOptions },
+        ]
+      : [...dealOptions, ...fleetOptions];
 
   return (
     <>
@@ -118,17 +178,19 @@ export default function GlobalSearch() {
         value={value}
         options={options}
         onSearch={onSearch}
-        onSelect={(id) => {
+        onSelect={(key: string) => {
           setValue('');
           setHits([]);
-          router.push(`/deals/${id}`);
+          setFleetHits([]);
+          // "go:<href>" for fleet records, "deal:<id>" for deals.
+          router.push(key.startsWith('go:') ? key.slice(3) : `/deals/${key.slice(5)}`);
         }}
         style={{ width: '100%', maxWidth: 480 }}
         popupMatchSelectWidth={480}
         classNames={{ popup: { root: 'pod-gsearch-pop' } }}
         notFoundContent={
           value.trim() && !busy
-            ? <div style={{ padding: '10px 6px', fontSize: 12, color: '#98A0AC', textAlign: 'center' }}>No cars match “{value}”</div>
+            ? <div style={{ padding: '10px 6px', fontSize: 12, color: '#98A0AC', textAlign: 'center' }}>Nothing matches “{value}”</div>
             : null
         }
       >
@@ -137,7 +199,7 @@ export default function GlobalSearch() {
           className="pod-gsearch"
           prefix={<SearchOutlined style={{ color: '#98A0AC', fontSize: 14, marginRight: 4 }} />}
           suffix={busy ? <Spin size="small" /> : kbdHint ? <span className="pod-gsearch-kbd">{kbdHint}</span> : null}
-          placeholder="Search by name, car or plate…"
+          placeholder="Search deals, vehicles, drivers, trips…"
           allowClear
         />
       </AutoComplete>

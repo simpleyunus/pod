@@ -43,6 +43,13 @@ export class FleetController {
     return this.fleet.updateLookup(table, id, LookupUpsertSchema.parse(body));
   }
 
+  // Cross-record quick find, backing the global search bar. Open to any
+  // signed-in user; it returns names and references only.
+  @Get('quick-find')
+  quickFind(@Query('q') q?: string) {
+    return this.fleet.quickFind(q ?? '');
+  }
+
   // ── Assets ───────────────────────────────────────────────────────────
 
   @Get('assets')

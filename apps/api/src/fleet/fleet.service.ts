@@ -308,6 +308,65 @@ export class FleetService {
     return record;
   }
 
+  /**
+   * Cross-record quick find for the global search bar.
+   *
+   * Meilisearch indexes deals only, so a registration, driver name or trip
+   * reference typed into the search bar found nothing — the fleet half of the
+   * app was unreachable except through the sidebar. These tables are small
+   * (POD runs two vehicles and one driver), so querying Postgres directly is
+   * both simpler and cheaper than keeping a second index in sync.
+   */
+  async quickFind(q: string) {
+    const term = q.trim();
+    if (term.length < 2) return [];
+    const like = { contains: term, mode: 'insensitive' as const };
+
+    const [assets, drivers, trips, incidents] = await Promise.all([
+      this.prisma.asset.findMany({
+        where: { active: true, OR: [{ fleetNo: like }, { registrationNo: like }, { vin: like }, { makeManufacturer: like }] },
+        select: { id: true, fleetNo: true, registrationNo: true, makeManufacturer: true },
+        take: 5,
+      }),
+      this.prisma.driver.findMany({
+        where: { active: true, OR: [{ surname: like }, { firstName: like }, { employeeNo: like }] },
+        select: { id: true, employeeNo: true, surname: true, firstName: true },
+        take: 5,
+      }),
+      this.prisma.assignment.findMany({
+        where: { reference: like },
+        select: { id: true, reference: true, asset: { select: { registrationNo: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      this.prisma.incident.findMany({
+        where: { OR: [{ reference: like }, { description: like }] },
+        select: { id: true, reference: true, date: true },
+        orderBy: { date: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    return [
+      ...assets.map((a) => ({
+        type: 'Vehicle', id: a.id, href: `/assets/${a.id}`,
+        title: `${a.fleetNo} · ${a.registrationNo}`, subtitle: a.makeManufacturer ?? '',
+      })),
+      ...drivers.map((d) => ({
+        type: 'Driver', id: d.id, href: `/drivers?id=${d.id}`,
+        title: `${d.firstName} ${d.surname}`, subtitle: `Employee ${d.employeeNo}`,
+      })),
+      ...trips.map((t) => ({
+        type: 'Trip', id: t.id, href: '/trips',
+        title: t.reference, subtitle: t.asset?.registrationNo ?? '',
+      })),
+      ...incidents.map((i) => ({
+        type: 'Incident', id: i.id, href: '/incidents',
+        title: i.reference, subtitle: i.date.toISOString().slice(0, 10),
+      })),
+    ];
+  }
+
   // ── Lookups ──────────────────────────────────────────────────────────
 
   async lookups() {

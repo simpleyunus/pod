@@ -18,6 +18,7 @@ import {
 import { useDeals } from '../_lib/hooks/useDeals';
 import { useLocations } from '../_lib/hooks/useReference';
 import RagTag, { KpiCard, PageHeader } from '../_components/RagTag';
+import RecordLink from '../_components/RecordLink';
 import PodCapture from './PodCapture';
 
 const { Text } = Typography;
@@ -120,12 +121,30 @@ export default function TripsClient() {
                   columns={[
                     { title: 'Trip', dataIndex: 'reference', render: (v) => <Text strong style={{ fontSize: 13 }}>{v}</Text> },
                     {
-                      title: 'Car', render: (_: any, r: any) => r.deal
-                        ? <span>{r.deal.make} {r.deal.model}<div style={{ fontSize: 11, color: '#98A0AC' }}>{r.deal.reference}</div></span>
-                        : <Text style={{ color: '#98A0AC' }}>—</Text>,
+                      title: 'Car',
+                      render: (_: any, r: any) => r.deal ? (
+                        <RecordLink href={`/deals/${r.deal.id}`}>
+                          {r.deal.make} {r.deal.model}
+                          <div style={{ fontSize: 11, color: '#98A0AC' }}>{r.deal.reference}</div>
+                        </RecordLink>
+                      ) : <Text style={{ color: '#98A0AC' }}>—</Text>,
                     },
-                    { title: 'Vehicle', render: (_: any, r: any) => `${r.asset.fleetNo} · ${r.asset.registrationNo}` },
-                    { title: 'Driver', render: (_: any, r: any) => `${r.driver.firstName} ${r.driver.surname}` },
+                    {
+                      title: 'Vehicle',
+                      render: (_: any, r: any) => (
+                        <RecordLink href={`/assets/${r.asset.id}`}>
+                          {r.asset.fleetNo} · {r.asset.registrationNo}
+                        </RecordLink>
+                      ),
+                    },
+                    {
+                      title: 'Driver',
+                      render: (_: any, r: any) => (
+                        <RecordLink href={`/drivers?id=${r.driver.id}`}>
+                          {r.driver.firstName} {r.driver.surname}
+                        </RecordLink>
+                      ),
+                    },
                     { title: 'Carrier', dataIndex: ['carrier', 'name'], render: (v) => v ?? 'Own fleet' },
                     { title: 'Departs', dataIndex: 'plannedDepartureAt', render: (v) => fmtDate(v) },
                     {
@@ -401,7 +420,7 @@ function MassTab() {
           columns={[
             // R3 Trip Mass Record columns.
             { title: 'Date', dataIndex: 'date', render: (v) => new Date(v).toLocaleDateString('en-GB') },
-            { title: 'Vehicle reg no', dataIndex: ['asset', 'registrationNo'] },
+            { title: 'Vehicle reg no', render: (_: any, r: any) => <RecordLink href={`/assets/${r.asset.id}`}>{r.asset.registrationNo}</RecordLink> },
             {
               title: 'Mass loaded / passengers loaded', align: 'right' as const,
               render: (_: any, r: any) => r.massLoadedKg !== null
