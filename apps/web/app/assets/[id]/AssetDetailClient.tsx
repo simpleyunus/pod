@@ -52,7 +52,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
         <Col xs={24} lg={10}>
-          <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4', height: '100%' }}>
+          <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF', height: '100%' }}>
             <Descriptions column={1} size="small" labelStyle={{ color: '#98A0AC', fontSize: 12 }}>
               <Descriptions.Item label="VIN">{asset.vin ?? '—'}</Descriptions.Item>
               <Descriptions.Item label="Maximum loading mass">
@@ -69,7 +69,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           <Card
             size="small"
             title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Compliance documents</Text>}
-            style={{ borderRadius: 14, border: '1px solid #E9E9E4', height: '100%' }}
+            style={{ borderRadius: 14, border: '1px solid #E3E9EF', height: '100%' }}
             styles={{ body: { padding: 0 } }}
           >
             <Table
@@ -91,7 +91,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           {
             key: 'maintenance', label: `Maintenance (${asset.workOrders?.length ?? 0})`,
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="id" dataSource={asset.workOrders} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No work orders' }}
@@ -115,7 +115,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           {
             key: 'inspections', label: `Inspections (${asset.inspections?.length ?? 0})`,
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="id" dataSource={asset.inspections} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No inspections' }}
@@ -131,7 +131,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           {
             key: 'tyres', label: `Tyres (${asset.tyreRecords?.length ?? 0})`,
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="id" dataSource={asset.tyreRecords} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No tyre records' }}
@@ -150,7 +150,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           {
             key: 'trips', label: `Trips (${asset.assignments?.length ?? 0})`,
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="id" dataSource={asset.assignments} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No trips' }}
@@ -168,7 +168,7 @@ export default function AssetDetailClient({ id }: { id: string }) {
           {
             key: 'history', label: 'History',
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}>
                 {asset.events?.length ? (
                   <Timeline
                     items={asset.events.map((e: any) => ({

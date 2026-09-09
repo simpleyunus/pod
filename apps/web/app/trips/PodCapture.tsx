@@ -34,7 +34,7 @@ function SignaturePad({ onChange }: { onChange: (blob: Blob | null) => void }) {
     const ctx = canvasRef.current!.getContext('2d')!;
     const { x, y } = pos(e);
     ctx.lineTo(x, y);
-    ctx.strokeStyle = '#101828';
+    ctx.strokeStyle = '#0E1B2A';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.stroke();
@@ -66,7 +66,7 @@ function SignaturePad({ onChange }: { onChange: (blob: Blob | null) => void }) {
         onPointerLeave={end}
         style={{
           width: '100%', height: 170, background: '#fff', borderRadius: 12,
-          border: '1px dashed #D6D6CF', touchAction: 'none', display: 'block',
+          border: '1px dashed #CBD5E0', touchAction: 'none', display: 'block',
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>

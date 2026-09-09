@@ -57,7 +57,7 @@ export default function MaintenanceClient() {
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
         <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Services overdue" value={data.overdueCount} accent="#B42318" tint="#FEE4E2" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<ToolOutlined />} label="Open work orders" value={data.openWorkOrders.length} accent="#9A6208" tint="#FCF3E1" /></Col>
-        <Col xs={12} md={6}><KpiCard icon={<CheckSquareOutlined />} label="Inspections (30 days)" value={data.inspectionsLast30Days} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<CheckSquareOutlined />} label="Inspections (30 days)" value={data.inspectionsLast30Days} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Failed inspections" value={data.failedInspections.length} accent="#B42318" tint="#FEE4E2" /></Col>
       </Row>
 
@@ -66,7 +66,7 @@ export default function MaintenanceClient() {
           {
             key: 'due', label: `Service schedule (${data.servicesDue.length})`,
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="planId" dataSource={data.servicesDue} pagination={false} scroll={{ x: 'max-content' }}
                   locale={{ emptyText: 'No maintenance plans configured' }}
@@ -117,7 +117,7 @@ function WorkOrdersTab() {
   );
 
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={{ pageSize: 20, hideOnSinglePage: true }}
         scroll={{ x: 'max-content' }}
@@ -165,7 +165,7 @@ function WorkOrdersTab() {
 function InspectionsTab() {
   const { data = [], isLoading } = useInspections();
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={{ pageSize: 20, hideOnSinglePage: true }}
         scroll={{ x: 'max-content' }}

@@ -73,7 +73,7 @@ const { Text, Title } = Typography;
 
 const STATUS_COLORS: Record<string, { dot: string; bg: string; text: string }> = {
   'Deposit paid':            { dot: '#7C5CFC', bg: '#F1EEFE', text: '#5B3FD4' },
-  'Purchased':               { dot: '#98A0AC', bg: '#F1F2F0', text: '#3A4150' },
+  'Purchased':               { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' },
   'Documents in progress':   { dot: '#F59E0B', bg: '#FCF3E1', text: '#9A6208' },
   'In transit':              { dot: '#3B82F6', bg: '#E9F0FE', text: '#1D4ED8' },
   'At border':               { dot: '#F97316', bg: '#FCEEE4', text: '#C2410C' },
@@ -110,14 +110,14 @@ function fmt(amount: number | null | undefined, currency?: string | null) {
 
 function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: '1px solid #F1F1EC' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', borderBottom: '1px solid #EDF1F6' }}>
       <Text style={{ fontSize: 10, color: '#98A0AC', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.7 }}>{label}</Text>
       <Text style={{ fontSize: 13, color: '#171B26', fontWeight: 500, textAlign: 'right', maxWidth: '60%' }}>{value ?? '—'}</Text>
     </div>
   );
 }
 
-const cardStyle: React.CSSProperties = { borderRadius: 14, border: '1px solid #E9E9E4' };
+const cardStyle: React.CSSProperties = { borderRadius: 14, border: '1px solid #E3E9EF' };
 
 // Actions wear the signal accent; structure stays ink and paper.
 const actionBtn: React.CSSProperties = {
@@ -317,11 +317,11 @@ export default function DealDetailPage() {
         </Link>
 
         {/* Deal header */}
-        <Card style={{ borderRadius: 16, border: '1px solid #E9E9E4' }} styles={{ body: { padding: '20px 24px' } }}>
+        <Card style={{ borderRadius: 16, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '20px 24px' } }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#101828', fontWeight: 700, letterSpacing: 0.5 }}>
+                <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: '#0E1B2A', fontWeight: 700, letterSpacing: 0.5 }}>
                   {deal.reference}
                 </Text>
                 {statusCfg ? (
@@ -365,7 +365,7 @@ export default function DealDetailPage() {
 
           {/* The journey of every car — milestone strip from the concept doc */}
           {statuses?.length > 0 && (
-            <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #F1F1EC' }}>
+            <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #EDF1F6' }}>
               <MilestoneBar statuses={statuses} currentStatusId={deal.currentStatusId} />
             </div>
           )}
@@ -397,7 +397,7 @@ export default function DealDetailPage() {
                 {canWrite && (
                   <div
                     onClick={() => document.getElementById('media-input')?.click()}
-                    style={{ border: '1.5px dashed #E9E9E4', borderRadius: 10, padding: '16px 12px', textAlign: 'center', cursor: 'pointer', background: '#FAFAF7', marginBottom: deal.media?.length ? 10 : 0 }}
+                    style={{ border: '1.5px dashed #E3E9EF', borderRadius: 10, padding: '16px 12px', textAlign: 'center', cursor: 'pointer', background: '#FAFAF7', marginBottom: deal.media?.length ? 10 : 0 }}
                   >
                     <InboxOutlined style={{ fontSize: 22, color: '#C3C9D2' }} />
                     <div style={{ marginTop: 4 }}>
@@ -417,8 +417,8 @@ export default function DealDetailPage() {
                 <Row gutter={[8, 8]}>
                   {deal.media?.map((asset: any) => (
                     <Col key={asset.id} xs={12}>
-                      <div style={{ borderRadius: 8, border: '1px solid #E9E9E4', background: '#fff', overflow: 'hidden' }}>
-                        <div style={{ height: 58, background: '#F6F6F3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#C3C9D2' }}>
+                      <div style={{ borderRadius: 8, border: '1px solid #E3E9EF', background: '#fff', overflow: 'hidden' }}>
+                        <div style={{ height: 58, background: '#F2F5F8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: '#C3C9D2' }}>
                           {asset.kind === 'VIDEO' ? '🎬' : '🖼'}
                         </div>
                         <div style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -463,14 +463,14 @@ export default function DealDetailPage() {
                     const cfg = EVENT_ICON[ev.type] ?? EVENT_ICON['SYSTEM'];
                     return {
                       dot: (
-                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#F6F6F3', border: '1.5px solid #E9E9E4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: cfg.color }}>
+                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#F2F5F8', border: '1.5px solid #E3E9EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: cfg.color }}>
                           {cfg.icon}
                         </div>
                       ),
                       children: (
-                        <div style={{ background: '#fff', border: '1px solid #F1F1EC', borderRadius: 8, padding: '8px 12px', marginBottom: 2 }}>
+                        <div style={{ background: '#fff', border: '1px solid #EDF1F6', borderRadius: 8, padding: '8px 12px', marginBottom: 2 }}>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Text style={{ fontSize: 12, fontWeight: 600, color: '#101828', textTransform: 'capitalize' }}>
+                            <Text style={{ fontSize: 12, fontWeight: 600, color: '#0E1B2A', textTransform: 'capitalize' }}>
                               {ev.type.replace(/_/g, ' ').toLowerCase()}
                             </Text>
                             {ev.status && (() => {
@@ -613,7 +613,7 @@ export default function DealDetailPage() {
 
                 {/* progress bar, like the concept doc */}
                 {deal.sellingPrice && (
-                  <div style={{ height: 5, borderRadius: 99, background: '#F1F1EC', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: 5, borderRadius: 99, background: '#EDF1F6', overflow: 'hidden', marginBottom: 8 }}>
                     <div style={{ height: '100%', width: `${paidPct}%`, borderRadius: 99, background: paidPct >= 100 ? '#12B76A' : '#E8503A', transition: 'width .3s' }} />
                   </div>
                 )}
@@ -622,9 +622,9 @@ export default function DealDetailPage() {
                 </span>
 
                 {deal.payments?.length > 0 && (
-                  <div style={{ marginTop: 10, borderTop: '1px solid #F1F1EC' }}>
+                  <div style={{ marginTop: 10, borderTop: '1px solid #EDF1F6' }}>
                     {deal.payments.map((p: any) => (
-                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0', borderBottom: '1px solid #F1F1EC' }}>
+                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '7px 0', borderBottom: '1px solid #EDF1F6' }}>
                         <div>
                           <Text style={{ fontSize: 12, fontWeight: 700, color: '#067647', fontVariantNumeric: 'tabular-nums', display: 'block' }}>
                             {fmt(p.amount, p.currency)}
@@ -650,7 +650,7 @@ export default function DealDetailPage() {
                     const received = doc?.received ?? false;
                     return (
                       <List.Item
-                        style={{ padding: '7px 0', borderBottom: '1px solid #F1F1EC' }}
+                        style={{ padding: '7px 0', borderBottom: '1px solid #EDF1F6' }}
                         actions={
                           canWrite
                             ? [
@@ -678,7 +678,7 @@ export default function DealDetailPage() {
                         }
                       >
                         <Space size={8}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: received ? '#12B76A' : '#E9E9E4', flexShrink: 0 }} />
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: received ? '#12B76A' : '#E3E9EF', flexShrink: 0 }} />
                           <div>
                             <Text style={{ fontSize: 12, fontWeight: 500, color: received ? '#067647' : '#171B26' }}>
                               {type.replace(/_/g, ' ')}
@@ -699,7 +699,7 @@ export default function DealDetailPage() {
                 />
 
                 {clientDocs.length > 0 && (
-                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #E9E9E4' }}>
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #E3E9EF' }}>
                     <Text style={{ fontSize: 10, fontWeight: 700, color: '#5B3FD4', textTransform: 'uppercase', letterSpacing: 1 }}>
                       From customer
                     </Text>

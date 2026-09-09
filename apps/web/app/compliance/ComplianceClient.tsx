@@ -28,8 +28,8 @@ function ElementCard({ el }: { el: any }) {
       size="small"
       style={{
         borderRadius: 14,
-        border: '1px solid #E9E9E4',
-        borderLeft: `3px solid ${RAG_BORDER[el.rag] ?? '#E9E9E4'}`,
+        border: '1px solid #E3E9EF',
+        borderLeft: `3px solid ${RAG_BORDER[el.rag] ?? '#E3E9EF'}`,
         height: '100%',
       }}
       styles={{ body: { padding: '13px 15px' } }}
@@ -53,7 +53,7 @@ function ElementCard({ el }: { el: any }) {
       )}
 
       {el.findings.length > 0 && (
-        <div style={{ marginTop: 10, borderTop: '1px solid #F1F1EC', paddingTop: 8 }}>
+        <div style={{ marginTop: 10, borderTop: '1px solid #EDF1F6', paddingTop: 8 }}>
           {el.findings.map((f: any, i: number) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 0' }}>
               <a
@@ -183,7 +183,7 @@ function ItemsTab() {
         ]}
         style={{ marginBottom: 14 }}
       />
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id"
           loading={isLoading}
@@ -222,7 +222,7 @@ function ItemsTab() {
 function PoliciesTab() {
   const { data = [], isLoading } = usePolicies();
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
         expandable={{ expandedRowRender: (r: any) => <Text style={{ fontSize: 12.5, color: '#3A4150' }}>{r.body}</Text> }}
@@ -244,7 +244,7 @@ function RiskTab() {
     return <Empty description="No risk assessments on file — element 2 stays red until at least one exists" />;
   }
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
         expandable={{
@@ -277,7 +277,7 @@ function RoutesTab() {
   const { data = [], isLoading } = useRoutes();
   if (!isLoading && !data.length) return <Empty description="No route risk assessments yet" />;
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
         columns={[
@@ -313,7 +313,7 @@ function PacksTab() {
       <Text style={{ fontSize: 12, color: '#98A0AC', display: 'block', marginBottom: 12 }}>
         Each pack renders POD's register set (R1–R17) through Gotenberg and merges it into one PDF, laid out as the toolkit lays them out.
       </Text>
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
           locale={{ emptyText: <Empty description="No audit packs yet — use Export audit pack" /> }}

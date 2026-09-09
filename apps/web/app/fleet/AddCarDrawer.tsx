@@ -26,7 +26,7 @@ const CURRENCIES = ['ZAR', 'USD', 'BWP', 'MWK', 'MZN', 'ZMW', 'ZWL'].map((c) => 
 
 function Section({ label }: { label: string }) {
   return (
-    <Text style={{ fontSize: 10, fontWeight: 700, color: '#101828', textTransform: 'uppercase', letterSpacing: 1, display: 'block', margin: '14px 0 10px' }}>
+    <Text style={{ fontSize: 10, fontWeight: 700, color: '#0E1B2A', textTransform: 'uppercase', letterSpacing: 1, display: 'block', margin: '14px 0 10px' }}>
       {label}
     </Text>
   );

@@ -42,7 +42,7 @@ export default function AssetsClient() {
       />
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
-        <Col xs={12} md={6}><KpiCard icon={<CarOutlined />} label="Active vehicles" value={assets.length} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<CarOutlined />} label="Active vehicles" value={assets.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<SafetyCertificateOutlined />} label="Fully compliant" value={assets.length - red - amber} accent="#067647" tint="#E6F6EE" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<ToolOutlined />} label="Documents due soon" value={amber} accent="#9A6208" tint="#FCF3E1" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Expired documents" value={red} accent="#B42318" tint="#FEE4E2" /></Col>
@@ -55,7 +55,7 @@ export default function AssetsClient() {
         style={{ maxWidth: 340, marginBottom: 14 }}
       />
 
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id"
           loading={isLoading}

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import api from '../../_lib/api';
 
-const NAVY = '#0B1220';
+const NAVY = '#0A1420';
 const ORANGE = '#E8503A';
 
 function Box({ label, children }: { label: string; children: React.ReactNode }) {

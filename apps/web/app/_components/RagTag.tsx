@@ -12,7 +12,7 @@ const TONES: Record<string, { bg: string; text: string; dot: string }> = {
   PASS:     { bg: '#E6F6EE', text: '#067647', dot: '#12B76A' },
   FAIL:     { bg: '#FEE4E2', text: '#B42318', dot: '#F04438' },
   OVERRIDDEN: { bg: '#F1EEFE', text: '#5B3FD4', dot: '#7C5CFC' },
-  NEUTRAL:  { bg: '#F1F2F0', text: '#3A4150', dot: '#98A0AC' },
+  NEUTRAL:  { bg: '#EDF1F6', text: '#3A4150', dot: '#98A0AC' },
 };
 
 export function ragOf(status?: string | null) {
@@ -67,7 +67,7 @@ export function KpiCard({
 }) {
   return (
     <div style={{
-      background: '#fff', border: '1px solid #E9E9E4', borderRadius: 14,
+      background: '#fff', border: '1px solid #E3E9EF', borderRadius: 14,
       padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 13,
     }}>
       <div style={{

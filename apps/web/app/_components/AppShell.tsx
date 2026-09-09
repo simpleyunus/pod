@@ -124,10 +124,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       .filter((m) => pathname === m.key || pathname.startsWith(m.key + '/'))
       .sort((a, b) => b.key.length - a.key.length)[0]?.key ?? '/fleet';
 
-  if (!checked) return <div style={{ minHeight: '100vh', background: '#F6F6F3' }} />;
+  if (!checked) return <div style={{ minHeight: '100vh', background: '#F2F5F8' }} />;
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    // The rail is painted on the Layout, not left to the Sider. antd's Sider
+    // carries height:100vh inline yet stops painting short of the viewport on
+    // short pages, leaving a pale band under the navy. Painting the first
+    // column here makes the rail full-height whatever the Sider does.
+    <Layout
+      style={{
+        minHeight: '100vh',
+        background: `linear-gradient(90deg, #0A1420 0 ${collapsed ? 80 : 222}px, #F2F5F8 ${collapsed ? 80 : 222}px)`,
+      }}
+    >
       <Sider
         className="pod-sider"
         trigger={null}
@@ -135,7 +144,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         collapsed={collapsed}
         width={222}
         style={{
-          background: 'linear-gradient(180deg, #0D1729 0%, #0B1220 100%)',
+          background: 'linear-gradient(180deg, #0E1B2A 0%, #0A1420 100%)',
           position: 'sticky',
           top: 0,
           height: '100vh',
@@ -165,7 +174,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Header melts into the canvas — the search pill and user chip float */}
         <Header
           style={{
-            background: '#F6F6F3',
+            background: '#F2F5F8',
             padding: '0 28px',
             height: 68,
             display: 'flex',
@@ -237,7 +246,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   gap: 10,
                   cursor: 'pointer',
                   background: '#FFFFFF',
-                  border: '1px solid #E9E9E4',
+                  border: '1px solid #E3E9EF',
                   borderRadius: 999,
                   padding: '5px 14px 5px 6px',
                   boxShadow: '0 1px 2px rgba(16,24,40,.05)',
@@ -250,7 +259,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     width: 30,
                     height: 30,
                     borderRadius: '50%',
-                    background: '#101828',
+                    background: '#0E1B2A',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -272,7 +281,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </Header>
 
-        <Content style={{ padding: '8px 28px 32px', background: '#F6F6F3', minHeight: 'calc(100vh - 68px)' }}>
+        <Content style={{ padding: '8px 28px 32px', background: '#F2F5F8', minHeight: 'calc(100vh - 68px)' }}>
           {children}
         </Content>
       </Layout>

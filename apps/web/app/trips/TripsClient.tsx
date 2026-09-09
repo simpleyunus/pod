@@ -88,7 +88,7 @@ export default function TripsClient() {
       />
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
-        <Col xs={12} md={6}><KpiCard icon={<TruckOutlined />} label="Trips" value={trips.length} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<TruckOutlined />} label="Trips" value={trips.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<ThunderboltOutlined />} label="In progress" value={inProgress} accent="#1D4ED8" tint="#E9F0FE" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<StopOutlined />} label="Blocked by gate" value={blocked} accent="#B42318" tint="#FEE4E2" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<SafetyOutlined />} label="Overridden" value={overridden} accent="#5B3FD4" tint="#F1EEFE" /></Col>
@@ -99,7 +99,7 @@ export default function TripsClient() {
           {
             key: 'board', label: 'Assignment board',
             children: (
-              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+              <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
                 <Table
                   rowKey="id" loading={isLoading} dataSource={trips}
                   pagination={{ pageSize: 20, hideOnSinglePage: true }} scroll={{ x: 'max-content' }}
@@ -396,7 +396,7 @@ function MassTab() {
       <Card
         size="small"
         title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Monthly overloading rate</Text>}
-        style={{ borderRadius: 14, border: '1px solid #E9E9E4', marginBottom: 12 }}
+        style={{ borderRadius: 14, border: '1px solid #E3E9EF', marginBottom: 12 }}
       >
         {monthly.length ? monthly.map((m: any) => (
           <div key={m.month} style={{ marginBottom: 9 }}>
@@ -406,14 +406,14 @@ function MassTab() {
                 {m.overloadingPct}% · {m.overloaded}/{m.total} trips
               </Text>
             </div>
-            <div style={{ height: 6, borderRadius: 99, background: '#EFEFEA', overflow: 'hidden' }}>
+            <div style={{ height: 6, borderRadius: 99, background: '#E9EEF3', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${(m.overloadingPct / worst) * 100}%`, borderRadius: 99, background: m.overloaded ? '#F04438' : '#12B76A' }} />
             </div>
           </div>
         )) : <Text style={{ fontSize: 12, color: '#98A0AC' }}>No trips weighed yet.</Text>}
       </Card>
 
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" dataSource={data?.records ?? []} pagination={{ pageSize: 15, hideOnSinglePage: true }}
           scroll={{ x: 'max-content' }} locale={{ emptyText: 'No mass records' }}

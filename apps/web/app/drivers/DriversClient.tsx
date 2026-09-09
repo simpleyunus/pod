@@ -50,14 +50,14 @@ export default function DriversClient() {
       />
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
-        <Col xs={8}><KpiCard icon={<TeamOutlined />} label="Active drivers" value={drivers.length} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={8}><KpiCard icon={<TeamOutlined />} label="Active drivers" value={drivers.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={8}><KpiCard icon={<IdcardOutlined />} label="Documents due soon" value={amber} accent="#9A6208" tint="#FCF3E1" /></Col>
         <Col xs={8}><KpiCard icon={<WarningOutlined />} label="Expired documents" value={red} accent="#B42318" tint="#FEE4E2" /></Col>
       </Row>
 
       <Input.Search placeholder="Search name or driver number…" allowClear onSearch={setQ} style={{ maxWidth: 320, marginBottom: 14 }} />
 
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" loading={isLoading} dataSource={drivers} pagination={{ pageSize: 20, hideOnSinglePage: true }}
           scroll={{ x: 'max-content' }}

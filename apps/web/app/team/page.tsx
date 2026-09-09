@@ -31,9 +31,9 @@ const ROLE_OPTIONS = [
 
 const ROLE_PILL: Record<string, { bg: string; text: string }> = {
   OWNER:      { bg: '#FDEDE9', text: '#C13A26' },
-  ADMIN:      { bg: '#F1F1EC', text: '#1D4ED8' },
+  ADMIN:      { bg: '#EDF1F6', text: '#1D4ED8' },
   CONSULTANT: { bg: '#E6F6EE', text: '#067647' },
-  VIEWER:     { bg: '#F1F2F0', text: '#616875' },
+  VIEWER:     { bg: '#EDF1F6', text: '#616875' },
 };
 
 export default function TeamPage() {
@@ -151,7 +151,7 @@ export default function TeamPage() {
       render: (_: any, r: any) =>
         canManage(r) ? (
           <Space size={4}>
-            <Button size="small" type="text" style={{ fontSize: 12, color: '#101828' }}
+            <Button size="small" type="text" style={{ fontSize: 12, color: '#0E1B2A' }}
               onClick={() => {
                 setEditing(r);
                 editForm.setFieldsValue({ fullName: r.fullName, email: r.email, role: r.role });
@@ -180,7 +180,7 @@ export default function TeamPage() {
           </Button>
         </div>
 
-        <Card style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+        <Card style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
           <Table
             dataSource={users ?? []}
             columns={columns}

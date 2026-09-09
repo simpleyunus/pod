@@ -1,18 +1,35 @@
 /* POD — "Ink & Signal" design system
-   Deep ink structure · one signal-orange accent · warm paper canvas */
+   Deep navy structure · one signal-orange accent · cool paper canvas
+
+   The neutrals are COOL (blue is the strongest channel) so they sit with the
+   navy chrome and the logo. They used to be warm creams, which fought the
+   blue-black sidebar and the already-cool text — that mismatch was what made
+   the UI read as unblended.
+
+   --ink is the navy taken from the POD mark, so the sidebar, the headings and
+   the logo are all literally the same blue. */
 
 :root {
-  --canvas: #f6f6f3;
+  --canvas: #f2f5f8;
   --card: #ffffff;
-  --border: #e9e9e4;
-  --divider: #f1f1ec;
-  --ink: #101828;
-  --text: #171b26;
-  --text-2: #616875;
-  --text-3: #98a0ac;
-  --signal: #e8503a;
+  --border: #e3e9ef;
+  --divider: #edf1f6;
+
+  --ink: #0e1b2a;        /* the POD navy */
+  --ink-deep: #0a1420;   /* sidebar foot */
+  --text: #16202b;
+  --text-2: #5a6876;
+  --text-3: #93a0ad;
+
+  --signal: #e8503a;     /* the orange in the mark */
   --signal-deep: #c13a26;
   --signal-tint: #fdede9;
+
+  /* Status. Amber is inherently warm, so it is pulled slightly blue-ward to
+     keep it in the same room as the rest. */
+  --ok: #0e9f6e;      --ok-tint: #e3f5ee;
+  --warn: #b8730a;    --warn-tint: #fbf2e3;
+  --bad: #b42318;     --bad-tint: #fdeae7;
 }
 
 html {
@@ -35,13 +52,13 @@ body {
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #d6d6cf;
+  background: #cbd5e0;
   border-radius: 99px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #bfbfb7;
+  background: #b3c0ce;
   border: 3px solid transparent;
   background-clip: content-box;
 }
@@ -62,7 +79,7 @@ body {
   display: none; /* antd's header column separators */
 }
 .ant-table-tbody > tr > td {
-  border-color: #f1f1ec !important;
+  border-color: #edf1f6 !important;
 }
 
 /* display face for overlay titles & buttons with presence */
@@ -98,3 +115,21 @@ body {
   color: var(--signal) !important;
   border-bottom-color: var(--signal) !important;
 }
+
+/* The selected sidebar item carries the signal colour on its edge. Without
+   this the accent appears nowhere in the chrome and the navy reads as flat. */
+.pod-sider .ant-menu-item-selected {
+  background: rgba(232, 80, 58, 0.14) !important;
+  position: relative;
+}
+.pod-sider .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--signal);
+}
+.pod-sider .ant-menu-item-selected .ant-menu-title-content,
+.pod-sider .ant-menu-item-selected .anticon { color: #fff !important; }
+.pod-sider .ant-menu-item:hover { background: rgba(255,255,255,.06) !important; }

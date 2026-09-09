@@ -35,7 +35,7 @@ function AnswerToggle({ value, onChange }: { value: Answer; onChange: (v: Answer
             style={{
               minWidth: 58, height: 44, borderRadius: 11, cursor: 'pointer', gap: 6,
               paddingInline: 10, fontWeight: 600,
-              border: active ? `1.5px solid ${o.on}` : '1px solid #E9E9E4',
+              border: active ? `1.5px solid ${o.on}` : '1px solid #E3E9EF',
               background: active ? o.bg : '#fff',
               color: active ? o.on : '#C4C8CE',
               fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -168,7 +168,7 @@ export default function InspectionForm({
               <div
                 key={item.id}
                 style={{
-                  background: '#fff', border: '1px solid #E9E9E4', borderRadius: 12,
+                  background: '#fff', border: '1px solid #E3E9EF', borderRadius: 12,
                   padding: '12px 14px', marginBottom: 8,
                 }}
               >
@@ -188,7 +188,7 @@ export default function InspectionForm({
                 </div>
 
                 {r?.answer === 'NO' && (
-                  <div style={{ marginTop: 10, borderTop: '1px solid #F1F1EC', paddingTop: 10 }}>
+                  <div style={{ marginTop: 10, borderTop: '1px solid #EDF1F6', paddingTop: 10 }}>
                     <Input.TextArea
                       rows={2} placeholder="What is wrong?"
                       value={r.note}

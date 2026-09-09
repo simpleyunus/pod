@@ -46,7 +46,7 @@ const { Text } = Typography;
 // One hue per stage so the pipeline reads at a glance.
 const STATUS_COLORS: Record<string, { dot: string; bg: string; text: string }> = {
   'Deposit paid':            { dot: '#7C5CFC', bg: '#F1EEFE', text: '#5B3FD4' },
-  'Purchased':               { dot: '#98A0AC', bg: '#F1F2F0', text: '#3A4150' },
+  'Purchased':               { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' },
   'Documents in progress':   { dot: '#F59E0B', bg: '#FCF3E1', text: '#9A6208' },
   'In transit':              { dot: '#3B82F6', bg: '#E9F0FE', text: '#1D4ED8' },
   'At border':               { dot: '#F97316', bg: '#FCEEE4', text: '#C2410C' },
@@ -55,7 +55,7 @@ const STATUS_COLORS: Record<string, { dot: string; bg: string; text: string }> =
   'Delivered':               { dot: '#12B76A', bg: '#E6F6EE', text: '#067647' },
 };
 
-const FALLBACK_STATUS_COLOR = { dot: '#98A0AC', bg: '#F1F2F0', text: '#3A4150' };
+const FALLBACK_STATUS_COLOR = { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' };
 
 const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
   PAID:    { text: 'Paid',    color: '#067647' },
@@ -64,7 +64,7 @@ const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
 };
 
 // Consultant avatars — deterministic color per name
-const AVATAR_COLORS = ['#101828', '#E8503A', '#12805C', '#7C5CFC', '#2563EB', '#0E7490', '#B54708'];
+const AVATAR_COLORS = ['#0E1B2A', '#E8503A', '#12805C', '#7C5CFC', '#2563EB', '#0E7490', '#B54708'];
 function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) {
   const idx = (name.charCodeAt(0) + (name.charCodeAt(1) ?? 0)) % AVATAR_COLORS.length;
   const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -82,7 +82,7 @@ function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) 
 
 function KpiCard({ icon, label, value, accent, tint }: { icon: React.ReactNode; label: string; value: number; accent: string; tint: string }) {
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: '14px 16px' } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '14px 16px' } }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <div style={{ width: 38, height: 38, borderRadius: 11, background: tint, color: accent, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {icon}
@@ -113,7 +113,7 @@ function KanbanCard({ deal, canDrag, onOpen, onDragStart }: {
       className="pod-kanban-card"
       style={{
         background: '#fff',
-        border: '1px solid #E9E9E4',
+        border: '1px solid #E3E9EF',
         borderRadius: 12,
         padding: '10px 12px',
         boxShadow: '0 1px 2px rgba(16,24,40,.04)',
@@ -122,7 +122,7 @@ function KanbanCard({ deal, canDrag, onOpen, onDragStart }: {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: '#101828', fontWeight: 700, letterSpacing: 0.3 }}>
+        <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: '#0E1B2A', fontWeight: 700, letterSpacing: 0.3 }}>
           {deal.reference}
         </Text>
         {pay && <Text style={{ fontSize: 10, fontWeight: 700, color: pay.color }}>{pay.text}</Text>}
@@ -214,7 +214,7 @@ function KanbanView({ deals, statuses, canWrite }: { deals: any[]; statuses: any
             style={{
               flex: '0 0 250px',
               width: 250,
-              background: isOver ? '#FDEDE9' : '#EFEFEA',
+              background: isOver ? '#FDEDE9' : '#E9EEF3',
               border: `1.5px solid ${isOver ? '#F6C9BE' : 'transparent'}`,
               borderRadius: 14,
               transition: 'background .12s, border-color .12s',
@@ -223,10 +223,10 @@ function KanbanView({ deals, statuses, canWrite }: { deals: any[]; statuses: any
             {/* Column header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 12px 8px' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-              <Text style={{ fontSize: 11, fontWeight: 700, color: '#101828', textTransform: 'uppercase', letterSpacing: 0.6, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#0E1B2A', textTransform: 'uppercase', letterSpacing: 0.6, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {col.name}
               </Text>
-              <span style={{ fontSize: 10, fontWeight: 700, color: cfg.text, background: cfg.bg === '#EFEFEA' ? '#fff' : cfg.bg, border: '1px solid rgba(0,0,0,.04)', borderRadius: 99, padding: '1px 8px' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: cfg.text, background: cfg.bg === '#E9EEF3' ? '#fff' : cfg.bg, border: '1px solid rgba(0,0,0,.04)', borderRadius: 99, padding: '1px 8px' }}>
                 {items.length}
               </span>
             </div>
@@ -331,7 +331,7 @@ export default function BoardClient() {
       width: 148,
       sorter: (a: any, b: any) => (a.reference ?? '').localeCompare(b.reference ?? ''),
       render: (v: string) => (
-        <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#101828', fontWeight: 700, letterSpacing: 0.3 }}>
+        <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#0E1B2A', fontWeight: 700, letterSpacing: 0.3 }}>
           {v}
         </Text>
       ),
@@ -473,7 +473,7 @@ export default function BoardClient() {
 
       {/* KPI row */}
       <Row gutter={[12, 12]}>
-        <Col xs={12} md={4}><KpiCard icon={<FileTextOutlined />} label="Total" value={total} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<FileTextOutlined />} label="Total" value={total} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={4}><KpiCard icon={<CalendarOutlined />} label="Arriving this week" value={arriving} accent="#5B3FD4" tint="#F1EEFE" /></Col>
         <Col xs={12} md={4}><KpiCard icon={<CarOutlined />} label="In Transit" value={inTransit} accent="#1D4ED8" tint="#E9F0FE" /></Col>
         <Col xs={12} md={4}><KpiCard icon={<CloseCircleOutlined />} label="Unpaid" value={unpaid} accent="#B42318" tint="#FEECEB" /></Col>
@@ -482,10 +482,10 @@ export default function BoardClient() {
       </Row>
 
       {/* Filters */}
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: '10px 14px' } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '10px 14px' } }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Badge count={activeFilterCount} size="small" color="#E8503A" offset={[2, -2]}>
-            <FilterOutlined style={{ fontSize: 14, color: activeFilterCount ? '#101828' : '#98A0AC' }} />
+            <FilterOutlined style={{ fontSize: 14, color: activeFilterCount ? '#0E1B2A' : '#98A0AC' }} />
           </Badge>
 
           {view === 'table' && (
@@ -602,7 +602,7 @@ export default function BoardClient() {
 
       {/* Table or Kanban */}
       {view === 'table' ? (
-        <Card style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+        <Card style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
           <Table
             dataSource={items}
             columns={columns}

@@ -18,8 +18,8 @@ export default function MilestoneBar({
       {statuses.map((s, i) => {
         const done = currentIdx >= 0 && i < currentIdx;
         const current = i === currentIdx;
-        const lineLeftColor = i === 0 ? 'transparent' : done || current ? '#12B76A' : '#E9E9E4';
-        const lineRightColor = i === statuses.length - 1 ? 'transparent' : done ? '#12B76A' : '#E9E9E4';
+        const lineLeftColor = i === 0 ? 'transparent' : done || current ? '#12B76A' : '#E3E9EF';
+        const lineRightColor = i === statuses.length - 1 ? 'transparent' : done ? '#12B76A' : '#E3E9EF';
 
         return (
           <div key={s.id} style={{ flex: 1, minWidth: 86, textAlign: 'center' }}>
@@ -41,7 +41,7 @@ export default function MilestoneBar({
               ) : (
                 <div style={{
                   width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                  border: '2px solid #DDDDD6', flexShrink: 0,
+                  border: '2px solid #D3DCE5', flexShrink: 0,
                 }} />
               )}
               <div style={{ flex: 1, height: 2, background: lineRightColor }} />

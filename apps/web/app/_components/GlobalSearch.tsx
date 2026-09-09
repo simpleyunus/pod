@@ -119,7 +119,7 @@ export default function GlobalSearch() {
         </span>
         <span style={{
           fontSize: 9.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
-          color: '#3A4150', background: '#F1F2F0', borderRadius: 5, padding: '2px 7px', flexShrink: 0,
+          color: '#3A4150', background: '#EDF1F6', borderRadius: 5, padding: '2px 7px', flexShrink: 0,
         }}>
           {h.type}
         </span>
@@ -151,14 +151,14 @@ export default function GlobalSearch() {
         .pod-gsearch.ant-input-affix-wrapper {
           border-radius: 999px;
           background: #FFFFFF;
-          border: 1px solid #E9E9E4;
+          border: 1px solid #E3E9EF;
           box-shadow: 0 1px 2px rgba(16,24,40,.05);
           padding: 1px 16px;
           height: 45px;
           line-height: normal; /* the antd Header sets line-height: 64px */
           transition: border-color .15s, box-shadow .15s;
         }
-        .pod-gsearch.ant-input-affix-wrapper:hover { border-color: #DDDDD6; }
+        .pod-gsearch.ant-input-affix-wrapper:hover { border-color: #D3DCE5; }
         .pod-gsearch.ant-input-affix-wrapper-focused {
           border-color: #E8503A;
           box-shadow: 0 0 0 3px rgba(232,80,58,.12), 0 1px 2px rgba(16,24,40,.05);
@@ -167,12 +167,12 @@ export default function GlobalSearch() {
         .pod-gsearch .ant-input::placeholder { color: #98A0AC; }
         .pod-gsearch-kbd {
           font-size: 10px; font-weight: 600; color: #98A0AC;
-          background: #F6F6F3; border: 1px solid #E9E9E4; border-radius: 6px;
+          background: #F2F5F8; border: 1px solid #E3E9EF; border-radius: 6px;
           padding: 2px 7px; line-height: 14px; white-space: nowrap;
         }
         .pod-gsearch.ant-input-affix-wrapper-focused .pod-gsearch-kbd { display: none; }
         .pod-gsearch-pop .ant-select-item { border-radius: 10px; }
-        .pod-gsearch-pop .ant-select-item-option-active { background: #F6F6F3 !important; }
+        .pod-gsearch-pop .ant-select-item-option-active { background: #F2F5F8 !important; }
       `}</style>
       <AutoComplete
         value={value}

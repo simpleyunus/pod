@@ -37,7 +37,7 @@ function Tile({ icon, label, value, accent, tint, hint }: {
   icon: React.ReactNode; label: string; value: React.ReactNode; accent: string; tint: string; hint?: string;
 }) {
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: '14px 16px' } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '14px 16px' } }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <div style={{ width: 38, height: 38, borderRadius: 11, background: tint, color: accent, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
         <div>
@@ -54,7 +54,7 @@ function Tile({ icon, label, value, accent, tint, hint }: {
 function BarList({ title, items }: { title: string; items: Array<{ name: string; count: number }> }) {
   const max = Math.max(1, ...items.map((i) => i.count));
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
       title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>{title}</Text>}>
       <Space direction="vertical" size={8} style={{ width: '100%' }}>
         {items.map((i) => (
@@ -63,8 +63,8 @@ function BarList({ title, items }: { title: string; items: Array<{ name: string;
               <Text style={{ fontSize: 12, color: '#3A4150', fontWeight: 500 }}>{i.name}</Text>
               <Text style={{ fontSize: 12, color: '#616875', fontVariantNumeric: 'tabular-nums' }}>{i.count}</Text>
             </div>
-            <div style={{ height: 6, borderRadius: 99, background: '#EFEFEA', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${(i.count / max) * 100}%`, borderRadius: 99, background: '#101828' }} />
+            <div style={{ height: 6, borderRadius: 99, background: '#E9EEF3', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(i.count / max) * 100}%`, borderRadius: 99, background: '#0E1B2A' }} />
             </div>
           </div>
         ))}
@@ -113,9 +113,9 @@ function MonthChart({ monthly }: { monthly: Array<{ month: string; newCars: numb
         <div style={{ position: 'relative', flex: 1, height: H }}>
           {/* recessive gridlines */}
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ position: 'absolute', left: 0, right: 0, bottom: y(i * step), height: 1, background: '#F1F1EC' }} />
+            <div key={i} style={{ position: 'absolute', left: 0, right: 0, bottom: y(i * step), height: 1, background: '#EDF1F6' }} />
           ))}
-          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, background: '#DDDDD6' }} />
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, background: '#D3DCE5' }} />
 
           {/* bars */}
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end' }}>
@@ -146,7 +146,7 @@ function MonthChart({ monthly }: { monthly: Array<{ month: string; newCars: numb
                 {hover === i && (
                   <div style={{
                     position: 'absolute', bottom: H + 6, left: '50%', transform: 'translateX(-50%)',
-                    background: '#fff', border: '1px solid #E9E9E4', borderRadius: 10,
+                    background: '#fff', border: '1px solid #E3E9EF', borderRadius: 10,
                     boxShadow: '0 4px 14px rgba(16,24,40,.10)', padding: '8px 11px', zIndex: 5, whiteSpace: 'nowrap',
                   }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#171B26', marginBottom: 3 }}>
@@ -236,7 +236,7 @@ function SagePanel() {
     : sage.configured ? 'Configured, not connected' : 'Not configured';
 
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
       title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}><ApiOutlined /> Sage accounting</Text>}
       extra={
         <Space size={6}>
@@ -314,7 +314,7 @@ export default function ReportsPage() {
         <Row gutter={[12, 12]}>
           <Col xs={12} md={5}><Tile icon={<PlusCircleOutlined />} label="New cars" value={data.funnel.newCars} accent="#1D4ED8" tint="#E9F0FE" hint="in period" /></Col>
           <Col xs={12} md={5}><Tile icon={<CheckCircleOutlined />} label="Delivered" value={data.funnel.delivered} accent="#067647" tint="#E6F6EE" hint="in period" /></Col>
-          <Col xs={12} md={5}><Tile icon={<CarOutlined />} label="In progress" value={data.funnel.inProgress} accent="#101828" tint="#F1F2F0" /></Col>
+          <Col xs={12} md={5}><Tile icon={<CarOutlined />} label="In progress" value={data.funnel.inProgress} accent="#0E1B2A" tint="#EDF1F6" /></Col>
           <Col xs={12} md={4}><Tile icon={<CloseCircleOutlined />} label="Lost" value={data.funnel.lost} accent="#B42318" tint="#FEECEB" /></Col>
           <Col xs={12} md={5}>
             <Tile icon={<PercentageOutlined />} label="Conversion" accent="#5B3FD4" tint="#F1EEFE"
@@ -324,13 +324,13 @@ export default function ReportsPage() {
         </Row>
 
         {/* Month-on-month chart */}
-        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: '18px 20px 14px' } }}
+        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '18px 20px 14px' } }}
           title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Month-on-month breakdown</Text>}>
           <MonthChart monthly={data.monthly} />
         </Card>
 
         {/* Monthly detail */}
-        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
           title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Monthly detail</Text>}>
           <Table
             size="small"
@@ -348,7 +348,7 @@ export default function ReportsPage() {
         </Card>
 
         {/* Team performance */}
-        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
           title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Team performance · per consultant</Text>}>
           <Table
             size="small"
@@ -373,7 +373,7 @@ export default function ReportsPage() {
         </Row>
 
         {/* Money per currency */}
-        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
           title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#98A0AC', textTransform: 'uppercase', letterSpacing: 1.2 }}>Money by currency · all time</Text>}>
           <Table
             size="small"
@@ -390,7 +390,7 @@ export default function ReportsPage() {
         </Card>
 
         {/* Stalled deals */}
-        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }}
+        <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
           title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#C13A26', textTransform: 'uppercase', letterSpacing: 1.2 }}>⏱ Stalled — no movement in {data.totals.stalledDays}+ days</Text>}>
           {data.stalled.length ? (
             <Table

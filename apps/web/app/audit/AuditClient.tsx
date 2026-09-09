@@ -52,7 +52,7 @@ export default function AuditClient() {
       />
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
-        <Col xs={12} md={6}><KpiCard icon={<AuditOutlined />} label="Audits" value={audits.length} accent="#101828" tint="#F1F2F0" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<AuditOutlined />} label="Audits" value={audits.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Major non-conformances" value={majors} accent="#B42318" tint="#FEE4E2" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<CheckCircleOutlined />} label="Actions open" value={open.length} accent="#9A6208" tint="#FCF3E1" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Actions overdue" value={overdue.length} accent="#B42318" tint="#FEE4E2" /></Col>
@@ -84,7 +84,7 @@ function ActionsTab() {
         One register for every corrective action, whatever raised it — an incident, an audit finding,
         a traffic fine, or a breach of the fatigue policy.
       </Text>
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" loading={isLoading} dataSource={data} scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 20, hideOnSinglePage: true }}
@@ -157,7 +157,7 @@ function AuditsTab() {
           Schedule audit
         </Button>
       )}
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
           locale={{ emptyText: <Empty description="No internal audits scheduled" /> }}
@@ -254,7 +254,7 @@ function TrainingTab() {
           Record training
         </Button>
       )}
-      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+      <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id" loading={isLoading} dataSource={records} pagination={false} scroll={{ x: 'max-content' }}
           locale={{ emptyText: <Empty description="No training recorded" /> }}
@@ -296,7 +296,7 @@ function TrainingTab() {
 function ReviewsTab() {
   const { data = [], isLoading } = useReviews();
   return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E9E9E4' }} styles={{ body: { padding: 0 } }}>
+    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
       <Table
         rowKey="id" loading={isLoading} dataSource={data} pagination={false} scroll={{ x: 'max-content' }}
         locale={{ emptyText: <Empty description="No management review generated yet — one is produced automatically on the 1st of each month" /> }}

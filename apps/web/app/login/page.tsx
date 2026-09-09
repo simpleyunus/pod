@@ -5,7 +5,7 @@ import { useState } from 'react';
 import api from '../_lib/api';
 import { setSession } from '../_lib/auth';
 
-const NAVY = '#0B1220';
+const NAVY = '#0A1420';
 const ORANGE = '#E8503A';
 
 // ---------- Hauler convoy pieces (ported from the loading-state concept) ----------
