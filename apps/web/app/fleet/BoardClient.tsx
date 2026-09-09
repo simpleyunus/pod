@@ -64,7 +64,7 @@ const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
 };
 
 // Consultant avatars — deterministic color per name
-const AVATAR_COLORS = ['#0E1B2A', '#E8503A', '#12805C', '#7C5CFC', '#2563EB', '#0E7490', '#B54708'];
+const AVATAR_COLORS = ['#0E1B2A', '#3A5570', '#12805C', '#7C5CFC', '#2563EB', '#0E7490', '#B54708'];
 function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) {
   const idx = (name.charCodeAt(0) + (name.charCodeAt(1) ?? 0)) % AVATAR_COLORS.length;
   const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -484,7 +484,7 @@ export default function BoardClient() {
       {/* Filters */}
       <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '10px 14px' } }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Badge count={activeFilterCount} size="small" color="#E8503A" offset={[2, -2]}>
+          <Badge count={activeFilterCount} size="small" color="#0E1B2A" offset={[2, -2]}>
             <FilterOutlined style={{ fontSize: 14, color: activeFilterCount ? '#0E1B2A' : '#98A0AC' }} />
           </Badge>
 
@@ -567,7 +567,7 @@ export default function BoardClient() {
               {isFetching ? '…' : `${total} car${total === 1 ? '' : 's'}`}
             </Text>
             {activeFilterCount > 0 && (
-              <Button size="small" type="text" style={{ color: '#E8503A', fontWeight: 600, fontSize: 12 }}
+              <Button size="small" type="text" style={{ color: '#3A5570', fontWeight: 600, fontSize: 12 }}
                 onClick={() => setFilters({ page: 1, pageSize: 25 })}>
                 Clear all
               </Button>

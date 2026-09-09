@@ -22,10 +22,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           algorithm: theme.defaultAlgorithm,
           token: {
             // signal drives interactive accents: switches, radios, focus states
-            colorPrimary: '#E8503A',
-            colorInfo: '#E8503A',
+            colorPrimary: '#0E1B2A',
+            colorInfo: '#0E1B2A',
             colorLink: '#C13A26',
-            colorLinkHover: '#E8503A',
+            colorLinkHover: '#3A5570',
             colorText: '#171B26',
             colorTextSecondary: '#616875',
             colorTextTertiary: '#98A0AC',
@@ -77,7 +77,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               headerFontSize: 13,
             },
             Tabs: {
-              inkBarColor: '#E8503A',
+              inkBarColor: '#0E1B2A',
               itemActiveColor: '#171B26',
               itemSelectedColor: '#171B26',
               itemHoverColor: '#3A4150',
@@ -85,16 +85,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               titleFontSize: 13,
             },
             Input: {
-              activeBorderColor: '#E8503A',
+              activeBorderColor: '#3A5570',
               hoverBorderColor: '#D3DCE5',
-              activeShadow: '0 0 0 3px rgba(232,80,58,.10)',
+              activeShadow: '0 0 0 3px rgba(58,85,112,.12)',
             },
             Select: {
               optionSelectedBg: '#FDEDE9',
               optionActiveBg: '#F2F5F8',
-              activeBorderColor: '#E8503A',
+              activeBorderColor: '#3A5570',
               hoverBorderColor: '#D3DCE5',
-              activeOutlineColor: 'rgba(232,80,58,.10)',
+              activeOutlineColor: 'rgba(58,85,112,.12)',
             },
             Segmented: {
               trackBg: '#EDEDE8',
@@ -104,14 +104,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
               trackPadding: 3,
             },
             Tag: { borderRadius: 6 },
-            Badge: { colorPrimary: '#E8503A' },
+            Badge: { colorPrimary: '#0E1B2A' },
             Radio: { buttonSolidCheckedBg: '#0E1B2A' },
             Drawer: { borderRadiusLG: 16 },
             Modal: { borderRadiusLG: 16 },
             Message: { borderRadiusLG: 12 },
             Timeline: { tailColor: '#E3E9EF' },
-            Switch: { colorPrimary: '#E8503A', colorPrimaryHover: '#C13A26' },
-            Pagination: { colorPrimary: '#171B26', colorPrimaryHover: '#E8503A' },
+            Switch: { colorPrimary: '#0E1B2A', colorPrimaryHover: '#1D2939' },
+            Pagination: { colorPrimary: '#16202B', colorPrimaryHover: '#3A5570' },
           },
         }}
       >

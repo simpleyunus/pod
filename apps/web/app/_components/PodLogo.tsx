@@ -8,11 +8,13 @@ import { useState } from 'react';
 // typographic stand-in when it is not.
 //
 // To use the real logo, drop the files into apps/web/public/:
-//   pod-logo.svg   full wordmark, white on transparent (sits on the navy)
-//   pod-mark.svg   square icon for the collapsed rail (optional)
-// SVG is preferred; a 2x PNG works too — change the extension below.
-const WORDMARK = '/pod-logo.svg';
-const MARK = '/pod-mark.svg';
+//   pod-logo.png   full wordmark, white on transparent (sits on the navy)
+//   pod-mark.png   square crop for the collapsed rail
+// Both were extracted from the supplied navy lockup by keying out its
+// background, because the supplied wordmark had a transparency checkerboard
+// baked into its pixels and would have rendered as grey squares on the rail.
+const WORDMARK = '/pod-logo.png';
+const MARK = '/pod-mark.png';
 
 export default function PodLogo({ collapsed }: { collapsed: boolean }) {
   const [noWordmark, setNoWordmark] = useState(false);

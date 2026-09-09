@@ -28,8 +28,8 @@ export default function MilestoneBar({
               <div style={{ flex: 1, height: 2, background: lineLeftColor }} />
               {current ? (
                 <div style={{
-                  width: 18, height: 18, borderRadius: '50%', background: '#E8503A',
-                  boxShadow: '0 0 0 5px rgba(232,80,58,.14)', flexShrink: 0,
+                  width: 18, height: 18, borderRadius: '50%', background: '#0E1B2A',
+                  boxShadow: '0 0 0 5px rgba(14,27,42,.10)', flexShrink: 0,
                 }} />
               ) : done ? (
                 <div style={{
@@ -56,7 +56,7 @@ export default function MilestoneBar({
               {s.name}
             </div>
             {current && (
-              <div style={{ fontSize: 9, color: '#E8503A', fontWeight: 700, marginTop: 1, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              <div style={{ fontSize: 9, color: '#3A5570', fontWeight: 700, marginTop: 1, textTransform: 'uppercase', letterSpacing: '.04em' }}>
                 happening now
               </div>
             )}

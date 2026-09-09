@@ -160,8 +160,8 @@ export default function GlobalSearch() {
         }
         .pod-gsearch.ant-input-affix-wrapper:hover { border-color: #D3DCE5; }
         .pod-gsearch.ant-input-affix-wrapper-focused {
-          border-color: #E8503A;
-          box-shadow: 0 0 0 3px rgba(232,80,58,.12), 0 1px 2px rgba(16,24,40,.05);
+          border-color: #3A5570;
+          box-shadow: 0 0 0 3px rgba(58,85,112,.12), 0 1px 2px rgba(14,27,42,.05);
         }
         .pod-gsearch .ant-input { background: transparent; font-size: 13px; }
         .pod-gsearch .ant-input::placeholder { color: #98A0AC; }

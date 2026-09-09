@@ -312,7 +312,7 @@ export default function DealDetailPage() {
     <AppShell>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         {/* Back link */}
-        <Link href="/fleet" style={{ fontSize: 12, color: '#E8503A', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <Link href="/fleet" style={{ fontSize: 12, color: '#3A5570', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <ArrowLeftOutlined /> Fleet
         </Link>
 
@@ -423,7 +423,7 @@ export default function DealDetailPage() {
                         </div>
                         <div style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           {asset.scanStatus === 'CLEAN' ? (
-                            <Button type="link" size="small" style={{ padding: 0, fontSize: 11, height: 'auto', color: '#E8503A', fontWeight: 600 }}
+                            <Button type="link" size="small" style={{ padding: 0, fontSize: 11, height: 'auto', color: '#3A5570', fontWeight: 600 }}
                               onClick={async () => {
                                 const res = await api.get(`/api/media/${asset.id}/url`).then((r) => r.data);
                                 if (res.url) window.open(res.url, '_blank');
@@ -614,7 +614,7 @@ export default function DealDetailPage() {
                 {/* progress bar, like the concept doc */}
                 {deal.sellingPrice && (
                   <div style={{ height: 5, borderRadius: 99, background: '#EDF1F6', overflow: 'hidden', marginBottom: 8 }}>
-                    <div style={{ height: '100%', width: `${paidPct}%`, borderRadius: 99, background: paidPct >= 100 ? '#12B76A' : '#E8503A', transition: 'width .3s' }} />
+                    <div style={{ height: '100%', width: `${paidPct}%`, borderRadius: 99, background: paidPct >= 100 ? '#12B76A' : '#3A5570', transition: 'width .3s' }} />
                   </div>
                 )}
                 <span style={{ padding: '2px 9px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: payCfg?.bg, color: payCfg?.color }}>
@@ -657,7 +657,7 @@ export default function DealDetailPage() {
                                 doc ? (
                                   <Space size={4} key="acts">
                                     <Button size="small" type="text" icon={<PaperClipOutlined />} title="Attach file"
-                                      style={{ color: doc.objectKey ? '#98A0AC' : '#E8503A' }}
+                                      style={{ color: doc.objectKey ? '#93A0AD' : '#3A5570' }}
                                       onClick={() => attachDocFile(doc.id)} />
                                     {doc.objectKey && (
                                       <Switch size="small" checked={doc.visibleToClient}
@@ -668,7 +668,7 @@ export default function DealDetailPage() {
                                       onChange={(v) => updateDocument.mutate({ docId: doc.id, data: { received: v } })} />
                                   </Space>
                                 ) : (
-                                  <Button size="small" type="text" style={{ color: '#E8503A', fontSize: 11, fontWeight: 600 }}
+                                  <Button size="small" type="text" style={{ color: '#3A5570', fontSize: 11, fontWeight: 600 }}
                                     onClick={() => addDocument.mutate({ type, received: false })}>
                                     + Add
                                   </Button>

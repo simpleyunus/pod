@@ -43,7 +43,7 @@ body {
 }
 
 ::selection {
-  background: rgba(232, 80, 58, 0.16);
+  background: rgba(58, 85, 112, 0.16);
 }
 
 /* quiet scrollbars */
@@ -116,10 +116,11 @@ body {
   border-bottom-color: var(--signal) !important;
 }
 
-/* The selected sidebar item carries the signal colour on its edge. Without
-   this the accent appears nowhere in the chrome and the navy reads as flat. */
+/* The one place the accent still appears in the chrome, and deliberately the
+   only one: a 3px edge on the selected item. The fill is a plain white wash
+   rather than an orange tint — an accent earns its meaning by being rare. */
 .pod-sider .ant-menu-item-selected {
-  background: rgba(232, 80, 58, 0.14) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   position: relative;
 }
 .pod-sider .ant-menu-item-selected::before {
