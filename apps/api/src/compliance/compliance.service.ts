@@ -476,14 +476,29 @@ export class ComplianceService {
       { label: 'Safety objectives for this period', count: objectives.length, rag: objectives.length ? 'GREEN' : 'AMBER', link: '/compliance?tab=objectives' },
     ]);
 
-    // 2 — Risk management: assessments in date.
+    // 2 — Risk management: COVERAGE, not existence.
+    //
+    // One assessment on file used to score green. For a multi-vehicle
+    // cross-border operation that is plainly wrong: element 2 asks whether the
+    // risks of the work actually being done have been assessed, so the measure
+    // is how much of the operation is covered. A single generic document
+    // covering a fleet running four corridors is a gap, not a control.
     const overdueRisk = riskAssessments.filter((r) => r.reviewDueOn && r.reviewDueOn < now);
+    const overdueRoutes = routes.filter((r) => r.reviewDueOn && r.reviewDueOn < now);
+    // A journey with no route risk assessment attached is an unassessed
+    // journey — R6 is per route, not one sheet for the whole business.
+    const journeysUnassessed = await this.prisma.assignment.count({
+      where: { routeRiskAssessmentId: null, status: { isTerminal: false } },
+    });
     push('RISK_MANAGEMENT', [
-      { label: 'Risk assessments on file', count: riskAssessments.length, rag: riskAssessments.length ? 'GREEN' : 'RED', link: '/compliance?tab=risk' },
+      { label: 'Master risk assessment on file (R5)', count: riskAssessments.length, rag: riskAssessments.length ? 'GREEN' : 'RED', link: '/compliance?tab=risk' },
       { label: 'Assessments past review date', count: overdueRisk.length, rag: overdueRisk.length ? 'AMBER' : 'GREEN', link: '/compliance?tab=risk' },
+      { label: 'Route assessments past review date', count: overdueRoutes.length, rag: overdueRoutes.length ? 'AMBER' : 'GREEN', link: '/compliance?tab=routes' },
+      { label: 'Open trips with no route risk assessment', count: journeysUnassessed, rag: journeysUnassessed ? 'AMBER' : 'GREEN', link: '/trips' },
     ]);
 
     // 3 — Vehicle fitness: licences/COF plus overdue services and open jobs.
+    const roadworthinessJobs = openWorkOrders.filter((w) => w.roadworthiness);
     const overdueServices = plans.filter(
       (p) =>
         (p.nextDueDate && p.nextDueDate < now) ||
@@ -491,7 +506,11 @@ export class ComplianceService {
     );
     push('VEHICLE_FITNESS', [
       { label: 'Services overdue', count: overdueServices.length, rag: overdueServices.length ? 'RED' : 'GREEN', link: '/maintenance' },
-      { label: 'Open work orders', count: openWorkOrders.length, rag: openWorkOrders.length > 0 ? 'AMBER' : 'GREEN', link: '/maintenance' },
+      // Only jobs that bear on whether the vehicle is safe and legal to
+      // operate. Folding in every open work order meant a windscreen chip
+      // degraded fitness as much as a brake defect, so the element sat amber
+      // permanently and the colour stopped meaning anything.
+      { label: 'Open roadworthiness defects', count: roadworthinessJobs.length, rag: roadworthinessJobs.length > 0 ? 'AMBER' : 'GREEN', link: '/maintenance' },
       { label: 'Active vehicles', count: assets, rag: 'GREEN', link: '/assets' },
     ]);
 
@@ -512,11 +531,27 @@ export class ComplianceService {
       { label: 'Departed trips with no mass record', count: departedUnweighed.length, rag: departedUnweighed.length ? 'AMBER' : 'GREEN', link: '/trips?tab=mass' },
     ]);
 
-    // 6 — Journey management: route assessments and driver acknowledgement.
-    const unacknowledged = tripsAwaitingAck.filter((a) => !a.actualDepartureAt).length;
+    // 6 — Journey management.
+    //
+    // "Planned trips not yet departed" used to be listed here. A future trip
+    // that has not departed is the normal state of a plan, not a compliance
+    // gap, and listing it among the findings read as a fault even though its
+    // rag was already hardcoded green. Removed: a queue length is not a
+    // control. What belongs here is whether journeys are briefed and the
+    // briefings are current.
+    const ackedRouteVersions = new Set(
+      (await this.prisma.routeAcknowledgement.findMany({ select: { routeRiskAssessmentId: true, driverId: true, version: true } }))
+        .map((a) => `${a.routeRiskAssessmentId}:${a.driverId}:${a.version}`),
+    );
+    // A revised route invalidates prior acknowledgements, so the driver must
+    // have signed the version they are about to run.
+    const unbriefed = tripsAwaitingAck.filter(
+      (a) => a.route && !ackedRouteVersions.has(`${a.route.id}:${a.driverId}:${a.route.version}`),
+    ).length;
     push('JOURNEY_MANAGEMENT', [
       { label: 'Route risk assessments', count: routes.length, rag: routes.length ? 'GREEN' : 'AMBER', link: '/compliance?tab=routes' },
-      { label: 'Planned trips not yet departed', count: unacknowledged, rag: 'GREEN', link: '/trips' },
+      { label: 'Route briefings past review date', count: overdueRoutes.length, rag: overdueRoutes.length ? 'AMBER' : 'GREEN', link: '/compliance?tab=routes' },
+      { label: 'Open trips whose driver has not acknowledged the route', count: unbriefed, rag: unbriefed ? 'RED' : 'GREEN', link: '/trips' },
     ]);
 
     // 7 — Incident management: open incidents and overdue corrective actions.

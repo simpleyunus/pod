@@ -857,6 +857,13 @@ model WorkOrder {
   description String?
   odometerKm  Int?
 
+  // Does this job affect whether the vehicle is safe and legal to operate?
+  // Element 3 (vehicle fitness) counts only these. Without the distinction a
+  // windscreen chip degraded fitness exactly as much as a brake defect, so
+  // the element sat amber permanently and stopped carrying information.
+  // Defaults false: existing jobs are routine until someone says otherwise.
+  roadworthiness Boolean @default(false)
+
   partsCost  Decimal? @db.Decimal(12, 2)
   labourCost Decimal? @db.Decimal(12, 2)
   currency   String   @default("ZAR") @db.Char(3)

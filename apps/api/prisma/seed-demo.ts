@@ -357,14 +357,18 @@ async function main() {
     await prisma.maintenancePlan.upsert({ where: { id }, create: { id, ...data }, update: data });
   }
 
-  const WORK_ORDERS: Array<{ id: string; number: string; assetId: string; status: string; title: string; description: string; odometerKm?: number; parts?: number; labour?: number; supplier?: string; days: number }> = [
-    { id: 'demo_wo_01', number: 'WO-2026-0001', assetId: 'demo_ast_02', status: 'CLOSED',         title: 'Major service — 600 000 km',        description: 'Oil, filters, gearbox and diff oil, brake adjustment, full inspection.', odometerKm: 598_000, parts: 18_400, labour: 6_200, supplier: 'Scania Aeroton', days: -110 },
-    { id: 'demo_wo_02', number: 'WO-2026-0002', assetId: 'demo_ast_01', status: 'CLOSED',         title: 'Replace nearside headlamp',          description: 'Failed pre-trip check. Unit replaced and beam re-aimed.',                odometerKm: 411_200, parts: 2_150,  labour: 850,   supplier: 'Truck Electrics Kempton', days: -34 },
-    { id: 'demo_wo_03', number: 'WO-2026-0003', assetId: 'demo_ast_03', status: 'IN_PROGRESS',    title: 'Deck lock repair — upper deck rear', description: 'Lock will not seat. Carrier out of service until repaired and re-tested.', parts: 4_900, labour: 3_100, supplier: 'Afrit Service Centre', days: -6 },
-    { id: 'demo_wo_04', number: 'WO-2026-0004', assetId: 'demo_ast_02', status: 'AWAITING_PARTS', title: 'Air dryer cartridge',                description: 'Slow pressure build reported by driver. Cartridge on back-order.',       odometerKm: 612_400, parts: 3_250, labour: 900, supplier: 'Scania Aeroton', days: -12 },
-    { id: 'demo_wo_05', number: 'WO-2026-0005', assetId: 'demo_ast_05', status: 'APPROVED',       title: 'Front brake pads and discs',         description: 'Pads at wear limit at last service; approved for next workshop slot.',   odometerKm: 96_100, parts: 5_600, labour: 1_800, supplier: 'Toyota Midrand', days: -3 },
-    { id: 'demo_wo_06', number: 'WO-2026-0006', assetId: 'demo_ast_01', status: 'REQUESTED',      title: 'Windscreen chip repair',             description: 'Stone chip in the driver sight line — repair before it spreads.',        odometerKm: 418_300, days: -1 },
-    { id: 'demo_wo_07', number: 'WO-2026-0007', assetId: 'demo_ast_04', status: 'DONE',           title: 'Pre-delivery inspection',            description: 'New unit PDI: lashing points, ramps, lighting, brake test.',              parts: 0, labour: 2_400, supplier: 'Afrit Service Centre', days: -50 },
+  // `roadworthiness` marks the jobs that bear on whether the vehicle is safe and
+// legal to operate — brakes, air, lights, load securing. Element 3 counts only
+// these. The windscreen chip and the PDI are deliberately routine, so the
+// distinction is visible on the dashboard.
+const WORK_ORDERS: Array<{ id: string; number: string; assetId: string; status: string; title: string; description: string; odometerKm?: number; parts?: number; labour?: number; supplier?: string; days: number; roadworthiness?: boolean }> = [
+    { id: 'demo_wo_01', roadworthiness: true, number: 'WO-2026-0001', assetId: 'demo_ast_02', status: 'CLOSED',         title: 'Major service — 600 000 km',        description: 'Oil, filters, gearbox and diff oil, brake adjustment, full inspection.', odometerKm: 598_000, parts: 18_400, labour: 6_200, supplier: 'Scania Aeroton', days: -110 },
+    { id: 'demo_wo_02', roadworthiness: true, number: 'WO-2026-0002', assetId: 'demo_ast_01', status: 'CLOSED',         title: 'Replace nearside headlamp',          description: 'Failed pre-trip check. Unit replaced and beam re-aimed.',                odometerKm: 411_200, parts: 2_150,  labour: 850,   supplier: 'Truck Electrics Kempton', days: -34 },
+    { id: 'demo_wo_03', roadworthiness: true, number: 'WO-2026-0003', assetId: 'demo_ast_03', status: 'IN_PROGRESS',    title: 'Deck lock repair — upper deck rear', description: 'Lock will not seat. Carrier out of service until repaired and re-tested.', parts: 4_900, labour: 3_100, supplier: 'Afrit Service Centre', days: -6 },
+    { id: 'demo_wo_04', roadworthiness: true, number: 'WO-2026-0004', assetId: 'demo_ast_02', status: 'AWAITING_PARTS', title: 'Air dryer cartridge',                description: 'Slow pressure build reported by driver. Cartridge on back-order.',       odometerKm: 612_400, parts: 3_250, labour: 900, supplier: 'Scania Aeroton', days: -12 },
+    { id: 'demo_wo_05', roadworthiness: true, number: 'WO-2026-0005', assetId: 'demo_ast_05', status: 'APPROVED',       title: 'Front brake pads and discs',         description: 'Pads at wear limit at last service; approved for next workshop slot.',   odometerKm: 96_100, parts: 5_600, labour: 1_800, supplier: 'Toyota Midrand', days: -3 },
+    { id: 'demo_wo_06', roadworthiness: false, number: 'WO-2026-0006', assetId: 'demo_ast_01', status: 'REQUESTED',      title: 'Windscreen chip repair',             description: 'Stone chip in the driver sight line — repair before it spreads.',        odometerKm: 418_300, days: -1 },
+    { id: 'demo_wo_07', roadworthiness: false, number: 'WO-2026-0007', assetId: 'demo_ast_04', status: 'DONE',           title: 'Pre-delivery inspection',            description: 'New unit PDI: lashing points, ramps, lighting, brake test.',              parts: 0, labour: 2_400, supplier: 'Afrit Service Centre', days: -50 },
   ];
   for (const w of WORK_ORDERS) {
     const done = ['DONE', 'CLOSED'].includes(w.status);
@@ -373,6 +377,7 @@ async function main() {
       number: w.number, assetId: w.assetId, statusId: need(wo, w.status, 'Work order status').id,
       title: w.title, description: w.description, odometerKm: w.odometerKm ?? null,
       partsCost: w.parts ?? null, labourCost: w.labour ?? null, supplier: w.supplier ?? null,
+      roadworthiness: w.roadworthiness ?? false,
       requestedAt: at(w.days),
       approvedAt: w.status === 'REQUESTED' ? null : at(w.days + 1),
       startedAt: started ? at(w.days + 2) : null,
