@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MonthlyReviewService } from './monthly-review.service';
 
 // RTMS elements 1 and 2 plus the element-8 review record: policies,
 // objectives, risk assessments, routes and their acknowledgements.
 @Injectable()
 export class GovernanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly monthlyReview: MonthlyReviewService,
+  ) {}
 
   // ── Policies (element 1) ─────────────────────────────────────────────
   // Versioned by supersession: publishing never mutates the text staff have
@@ -263,7 +267,34 @@ export class GovernanceService {
 
   // ── Management reviews (element 8) ───────────────────────────────────
 
-  listReviews() {
-    return this.prisma.managementReview.findMany({ orderBy: { periodMonth: 'desc' }, take: 24 });
+  /**
+   * R17 Safety Performance Report, one row per calendar month.
+   *
+   * The six R17 figures are DERIVED on read, never typed in. They used to be
+   * served straight out of the stored `metrics` JSON, which had two problems:
+   * a snapshot written before the r17 shape existed rendered as six blank
+   * cells, and even a well-formed snapshot went stale the moment an incident
+   * or fine was recorded against a month already reviewed.
+   *
+   * So the counts always come from the live tables for that month's date
+   * range. What stays manual is the part that is a human act and cannot be
+   * derived: `reviewedAt` / `reviewedById` — someone actually looked at it.
+   * `notes` and the stored snapshot are preserved too, so an old record keeps
+   * whatever narrative was written at the time.
+   */
+  async listReviews() {
+    const reviews = await this.prisma.managementReview.findMany({
+      orderBy: { periodMonth: 'desc' },
+      take: 24,
+    });
+    return Promise.all(
+      reviews.map(async (r) => ({
+        ...r,
+        metrics: {
+          ...(r.metrics as object),
+          ...(await this.monthlyReview.metricsFor(r.periodMonth)),
+        },
+      })),
+    );
   }
 }
