@@ -320,6 +320,20 @@ export class ComplianceService {
 
     const fatigueBreaches = await this.fatigue.breachingDrivers(now);
 
+    // "Exists" and "done" are different questions, and several element rules
+    // used to answer the first while claiming to answer the second. These are
+    // the counts that tell them apart.
+    const [activeDriverCount, policyAcks, departedUnweighed] = await Promise.all([
+      this.prisma.driver.count({ where: { active: true } }),
+      this.prisma.policyAcknowledgement.findMany({ select: { policyId: true, driverId: true } }),
+      // A trip that has left with no mass record is an unanswered load
+      // question, not a neutral one (see the gate's MASS_LIMIT check).
+      this.prisma.assignment.findMany({
+        where: { actualDepartureAt: { not: null }, massRecords: { none: {} } },
+        select: { id: true },
+      }),
+    ]);
+
     // A required document with no record at all is unevidenced, which reads
     // the same as expired to an auditor. Counting only the items that exist
     // would let a vehicle with no Certificate of Fitness score green — and
@@ -402,6 +416,23 @@ export class ComplianceService {
         ];
       }
 
+      // An overdue corrective action colours the element it belongs to, not
+      // only the R9 register on element 7. Element 8 cannot be green while an
+      // action about monitoring and review is past its date, and the same is
+      // true of every other element.
+      const elementOverdue = overdueActionRows.filter((a) => a.auditFinding?.rtmsElement === key);
+      if (elementOverdue.length) {
+        findings = [
+          ...findings,
+          {
+            label: 'Corrective actions overdue for this element',
+            count: elementOverdue.length,
+            rag: 'RED',
+            link: '/audit?tab=actions',
+          },
+        ];
+      }
+
       // An open audit non-conformance colours the element it was raised on.
       const elementFindings = openFindings.filter((f) => f.rtmsElement === key);
       if (elementFindings.length) {
@@ -426,9 +457,22 @@ export class ComplianceService {
       });
     };
 
-    // 1 — Management commitment: policies exist and objectives are set.
+    // 1 — Management commitment: policies exist AND have been signed for.
+    // A policy on the shelf that no driver has acknowledged is a document,
+    // not a control, and an auditor treats it as one.
+    const ackPairs = new Set(policyAcks.filter((a) => a.driverId).map((a) => `${a.policyId}:${a.driverId}`));
+    const ackRequired = policies.length * activeDriverCount;
+    const ackMissing = Math.max(0, ackRequired - ackPairs.size);
     push('MANAGEMENT_COMMITMENT', [
       { label: 'Current policies', count: policies.length, rag: policies.length ? 'GREEN' : 'RED', link: '/compliance?tab=policies' },
+      {
+        label: 'Policy acknowledgements outstanding',
+        count: ackMissing,
+        // Some drift is normal in a live fleet; a third of the fleet unsigned
+        // is a systemic failure to communicate the policies.
+        rag: ackRequired === 0 ? 'GREEN' : ackMissing > ackRequired / 3 ? 'RED' : ackMissing ? 'AMBER' : 'GREEN',
+        link: '/compliance?tab=policies',
+      },
       { label: 'Safety objectives for this period', count: objectives.length, rag: objectives.length ? 'GREEN' : 'AMBER', link: '/compliance?tab=objectives' },
     ]);
 
@@ -463,6 +507,9 @@ export class ComplianceService {
     push('LOAD_MANAGEMENT', [
       { label: `Overloaded trips this month (${overloadPct.toFixed(1)}%, target ≤${target}%)`, count: overloaded, rag: overloadPct > target ? 'RED' : overloaded > 0 ? 'AMBER' : 'GREEN', link: '/trips?tab=mass' },
       { label: 'Trips weighed this month', count: massThisMonth.length, rag: 'GREEN', link: '/trips?tab=mass' },
+      // Overloading is the most-audited RTMS item; a trip that departed with
+      // no mass record is an open question, so it cannot read as green.
+      { label: 'Departed trips with no mass record', count: departedUnweighed.length, rag: departedUnweighed.length ? 'AMBER' : 'GREEN', link: '/trips?tab=mass' },
     ]);
 
     // 6 — Journey management: route assessments and driver acknowledgement.
@@ -480,12 +527,55 @@ export class ComplianceService {
       { label: 'Unpaid traffic fines', count: unpaidFines, rag: unpaidFines ? 'AMBER' : 'GREEN', link: '/incidents?tab=fines' },
     ]);
 
-    // 8 — Monitoring and review: was last month's review actually produced?
+    // 8 — Monitoring and review.
+    //
+    // This element used to go green on the existence of a ManagementReview
+    // row, which meant a review nobody had read scored the same as one signed
+    // off by management. Generating a report is not reviewing it: R17 exists
+    // to be looked at, and the sign-off is the only evidence that happened.
+    //
+    // Cadence is monthly (R17 is a calendar-month table), so last month's
+    // review is the one that must be complete. One month late is a slip;
+    // two months late is a lapsed management-review cycle.
     const lastMonthKey = lastMonth.toISOString().slice(0, 7);
-    const reviewCurrent = lastReview?.periodMonth === lastMonthKey || lastReview?.periodMonth === monthStart.toISOString().slice(0, 7);
-    push('MONITORING_REVIEW', [
-      { label: `Management review for ${lastMonthKey}`, count: reviewCurrent ? 1 : 0, rag: reviewCurrent ? 'GREEN' : 'AMBER', link: '/compliance?tab=reviews' },
+    // Cadence is monthly (R17 is a calendar-month table), so last month is the
+    // period that must be signed off. The question RED answers is "has the
+    // review cycle lapsed?", which is about how many periods have gone
+    // unsigned — not about the age of last month, which is one month by
+    // construction and made the red branch unreachable twice over.
+    const monthIndex = (key: string) => {
+      const [y, m] = key.split('-').map(Number);
+      return y * 12 + (m - 1);
+    };
+    const [signedOff, oldestReview] = await Promise.all([
+      this.prisma.managementReview.findFirst({
+        where: { reviewedAt: { not: null } },
+        orderBy: { periodMonth: 'desc' },
+      }),
+      this.prisma.managementReview.findFirst({ orderBy: { periodMonth: 'asc' } }),
     ]);
+    const requiredIdx = monthIndex(lastMonthKey);
+    // Periods outstanding: 0 = this period signed off, 1 = one behind, 2+ = the
+    // cycle has lapsed. With nothing ever signed off, count from the oldest
+    // review on file — a system with one unsigned month has slipped, a system
+    // with six has stopped reviewing.
+    const periodsBehind = signedOff
+      ? requiredIdx - monthIndex(signedOff.periodMonth)
+      : oldestReview
+        ? requiredIdx - monthIndex(oldestReview.periodMonth) + 1
+        : 1;
+    const reviewedForPeriod = signedOff?.periodMonth === lastMonthKey;
+    const reviewFinding: Finding = reviewedForPeriod
+      ? { label: `Management review for ${lastMonthKey} signed off`, count: 1, rag: 'GREEN', link: '/audit?tab=reviews' }
+      : {
+          label: lastReview?.periodMonth === lastMonthKey
+            ? `Management review for ${lastMonthKey} generated but not reviewed`
+            : `Management review for ${lastMonthKey} not done`,
+          count: 1,
+          rag: periodsBehind >= 2 ? 'RED' : 'AMBER',
+          link: '/audit?tab=reviews',
+        };
+    push('MONITORING_REVIEW', [reviewFinding]);
 
     const totals = countsOf(items);
     return {
