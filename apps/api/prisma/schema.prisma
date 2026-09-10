@@ -493,6 +493,7 @@ enum CorrectiveActionStatus {
 // Outcome of the compliance-aware assignment gate.
 enum GateDecision {
   PASS
+  WARN // departed with an unresolved advisory a human accepted
   FAIL
   OVERRIDDEN
 }
@@ -1106,6 +1107,14 @@ model Assignment {
   gateOverrideReason String?
   gateOverriddenById String? // User.id — ADMIN only
 
+  // An advisory (an unweighed load) blocks departure until someone accepts it
+  // in writing. Kept separate from the override above so the register can tell
+  // "we knew it was unweighed and went anyway" from "we bypassed a hard
+  // failure" — an auditor treats those very differently.
+  gateWarnAckAt     DateTime?
+  gateWarnAckById   String? // User.id
+  gateWarnAckReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1150,6 +1159,11 @@ model AssignmentGateCheck {
   code      String // DRIVER_LICENCE, ASSET_COF, FATIGUE_DAILY, MASS_LIMIT…
   label     String
   passed    Boolean
+  // Passed, but on an unanswered question rather than a satisfied one — an
+  // unweighed load, a night departure. The gate has always computed this;
+  // it used to be dropped on the way to the database, so a warning and a
+  // genuine pass were indistinguishable once persisted.
+  advisory  Boolean  @default(false)
   detail    String? // human-readable reason when failed
   checkedAt DateTime @default(now())
 

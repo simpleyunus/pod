@@ -444,18 +444,19 @@ const WORK_ORDERS: Array<{ id: string; number: string; assetId: string; status: 
   const TRIPS: Array<{
     id: string; reference: string; assetId: string; driverId: string; carrierId?: string;
     status: string; route?: string; from: string; to: string; depart: number; arrive: number;
-    km: number; gate: 'PASS' | 'FAIL' | 'OVERRIDDEN'; gateFail?: [string, string, string];
+    km: number; gate: 'PASS' | 'FAIL' | 'WARN' | 'OVERRIDDEN'; gateFail?: [string, string, string];
     massKg?: number; over?: boolean; pod?: string;
+    overrideReason?: string; warnAck?: string;
   }> = [
     { id: 'demo_trp_01', reference: 'TRIP-2026-0101', assetId: 'demo_ast_01', driverId: 'demo_drv_01', status: 'DELIVERED',    route: 'demo_rra_01', from: 'Supplier (SA)', to: 'Harare depot',     depart: -28, arrive: -26, km: 1_128, gate: 'PASS', massKg: 21_400, pod: 'T. Marufu' },
-    { id: 'demo_trp_02', reference: 'TRIP-2026-0102', assetId: 'demo_ast_01', driverId: 'demo_drv_01', status: 'DELIVERED',    route: 'demo_rra_01', from: 'Supplier (SA)', to: 'Harare depot',     depart: -14, arrive: -12, km: 1_128, gate: 'PASS', massKg: 19_800, pod: 'T. Marufu' },
+    { id: 'demo_trp_02', reference: 'TRIP-2026-0102', assetId: 'demo_ast_01', driverId: 'demo_drv_01', status: 'DELIVERED',    route: 'demo_rra_01', from: 'Supplier (SA)', to: 'Harare depot',     depart: -14, arrive: -12, km: 1_128, gate: 'OVERRIDDEN', massKg: 27_200, pod: 'T. Marufu', overrideReason: 'Weighbridge showed 27 200 kg against a 26 000 kg limit. One unit offloaded at the depot and the trip re-weighed before the border; departure authorised by the fleet manager on that basis.' },
     { id: 'demo_trp_03', reference: 'TRIP-2026-0103', assetId: 'demo_ast_02', driverId: 'demo_drv_04', carrierId: 'demo_car_02', status: 'DELIVERED', route: 'demo_rra_02', from: 'Supplier (SA)', to: 'Clearing agent', depart: -9, arrive: -6, km: 1_580, gate: 'OVERRIDDEN', gateFail: ['ASSET_SERVICE_DUE', 'Service due', 'Service interval exceeded by 900 km'], massKg: 23_100, pod: 'K. Phiri' },
     { id: 'demo_trp_04', reference: 'TRIP-2026-0104', assetId: 'demo_ast_04', driverId: 'demo_drv_05', status: 'IN_PROGRESS',  route: 'demo_rra_03', from: 'Clearing agent', to: 'Harare depot',    depart: -2, arrive: 1,  km: 640,  gate: 'PASS', massKg: 22_600 },
     { id: 'demo_trp_05', reference: 'TRIP-2026-0105', assetId: 'demo_ast_01', driverId: 'demo_drv_02', status: 'IN_PROGRESS',  route: 'demo_rra_01', from: 'Supplier (SA)', to: 'Beitbridge border', depart: -1, arrive: 1, km: 560, gate: 'PASS', massKg: 20_100 },
     { id: 'demo_trp_06', reference: 'TRIP-2026-0106', assetId: 'demo_ast_03', driverId: 'demo_drv_03', status: 'GATE_BLOCKED', route: 'demo_rra_01', from: 'Supplier (SA)', to: 'Harare depot',     depart: 1,  arrive: 3,  km: 1_128, gate: 'FAIL', gateFail: ['DRIVER_PRDP', 'Professional Driving Permit', 'Expired 22 days ago'] },
     { id: 'demo_trp_07', reference: 'TRIP-2026-0107', assetId: 'demo_ast_02', driverId: 'demo_drv_04', carrierId: 'demo_car_01', status: 'PLANNED', route: 'demo_rra_02', from: 'Supplier (SA)', to: 'Clearing agent', depart: 3, arrive: 6, km: 1_580, gate: 'PASS' },
     { id: 'demo_trp_08', reference: 'TRIP-2026-0108', assetId: 'demo_ast_04', driverId: 'demo_drv_06', status: 'PLANNED',      route: 'demo_rra_03', from: 'Clearing agent', to: 'Harare depot',    depart: 5,  arrive: 7,  km: 640,  gate: 'PASS' },
-    { id: 'demo_trp_09', reference: 'TRIP-2026-0109', assetId: 'demo_ast_05', driverId: 'demo_drv_02', status: 'DELIVERED',    from: 'Harare depot', to: 'With customer',    depart: -20, arrive: -20, km: 41, gate: 'PASS', pod: 'N. Chirwa' },
+    { id: 'demo_trp_09', reference: 'TRIP-2026-0109', assetId: 'demo_ast_05', driverId: 'demo_drv_02', status: 'DELIVERED',    from: 'Harare depot', to: 'With customer',    depart: -20, arrive: -20, km: 41, gate: 'WARN', pod: 'N. Chirwa', warnAck: 'Final-mile delivery of a single unit on the bakkie; no weighbridge on the route. Load is well inside the 1 000 kg limit by inspection.' },
     { id: 'demo_trp_10', reference: 'TRIP-2026-0110', assetId: 'demo_ast_02', driverId: 'demo_drv_01', carrierId: 'demo_car_03', status: 'CANCELLED', from: 'Supplier (SA)', to: 'Harare depot', depart: -18, arrive: -16, km: 1_128, gate: 'PASS' },
   ];
 
@@ -485,8 +486,12 @@ const WORK_ORDERS: Array<{ id: string; number: string; assetId: string; status: 
       distanceKm: t.km,
       gateDecision: t.gate, gateCheckedAt: at(t.depart, 4),
       gateOverrideReason: t.gate === 'OVERRIDDEN'
-        ? 'Service booked on arrival in Lusaka; risk accepted by the fleet manager for this leg only.'
+        ? t.overrideReason ?? 'Service booked on arrival in Lusaka; risk accepted by the fleet manager for this leg only.'
         : null,
+      // An unweighed departure is a WARN that someone signed for, which is a
+      // different fact from an override of a hard failure.
+      gateWarnAckAt: t.warnAck ? at(t.depart, 5) : null,
+      gateWarnAckReason: t.warnAck ?? null,
       podCapturedAt: done && t.pod ? at(t.arrive, 15) : null,
       podReceivedByName: done ? t.pod ?? null : null,
       podNotes: done && t.pod ? 'All units offloaded, no transit damage noted.' : null,
@@ -500,12 +505,40 @@ const WORK_ORDERS: Array<{ id: string; number: string; assetId: string; status: 
       ['ASSET_LICENCE', 'Vehicle licence'], ['FATIGUE_DAILY', 'Daily driving hours'],
       ['ROUTE_ACK', 'Route briefing acknowledged'], ['ASSET_SERVICE_DUE', 'Service due'],
     ];
+
+    // The load check is not one of the boilerplate rows: it has three
+    // outcomes, and which one applies depends on this trip's own mass record.
+    const asset = ASSETS.find((a) => a.id === t.assetId)!;
+    const overloaded = t.massKg !== undefined && t.massKg > asset.maxLoadingMassKg;
+    await prisma.assignmentGateCheck.upsert({
+      where: { id: `${t.id}_gc_mass` },
+      create: {
+        id: `${t.id}_gc_mass`, assignmentId: t.id,
+        code: 'MASS_LIMIT', label: 'Load within permissible maximum',
+        passed: !overloaded, advisory: t.massKg === undefined,
+        detail: overloaded
+          ? `${t.massKg!.toLocaleString()} kg exceeds the ${asset.maxLoadingMassKg.toLocaleString()} kg limit`
+          : t.massKg === undefined
+            ? 'Not weighed — record a mass, or acknowledge departing unweighed'
+            : `${t.massKg.toLocaleString()} kg of ${asset.maxLoadingMassKg.toLocaleString()} kg`,
+        checkedAt: at(t.depart, 4),
+      },
+      update: {
+        passed: !overloaded, advisory: t.massKg === undefined,
+        detail: overloaded
+          ? `${t.massKg!.toLocaleString()} kg exceeds the ${asset.maxLoadingMassKg.toLocaleString()} kg limit`
+          : t.massKg === undefined
+            ? 'Not weighed — record a mass, or acknowledge departing unweighed'
+            : `${t.massKg.toLocaleString()} kg of ${asset.maxLoadingMassKg.toLocaleString()} kg`,
+      },
+    });
     for (const [i, [code, label]] of CHECKS.entries()) {
       const failing = t.gateFail?.[0] === code;
       const id = `${t.id}_gc${i}`;
       const data = {
         assignmentId: t.id, code, label,
         passed: !failing,
+        advisory: false,
         detail: failing ? t.gateFail![2] : null,
         checkedAt: at(t.depart, 4),
       };

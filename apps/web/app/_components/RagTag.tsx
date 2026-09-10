@@ -11,13 +11,18 @@ export const RAG_TONES: Record<string, { bg: string; text: string; dot: string }
   EXPIRED:  { bg: '#FEE4E2', text: '#B42318', dot: '#F04438' },
   PASS:     { bg: '#E6F6EE', text: '#067647', dot: '#12B76A' },
   FAIL:     { bg: '#FEE4E2', text: '#B42318', dot: '#F04438' },
+  // A gate that passed on an unanswered question rather than a satisfied one
+  // — an unweighed load. Amber, because it is neither a clean pass nor a
+  // bypassed failure; without a tone of its own it rendered as neutral grey,
+  // which is exactly the silence the load rules exist to remove.
+  WARN:     { bg: '#FCF3E1', text: '#9A6208', dot: '#F59E0B' },
   OVERRIDDEN: { bg: '#F1EEFE', text: '#5B3FD4', dot: '#7C5CFC' },
   NEUTRAL:  { bg: '#EDF1F6', text: '#3A4150', dot: '#98A0AC' },
 };
 
 export function ragOf(status?: string | null) {
   if (status === 'EXPIRED' || status === 'RED' || status === 'FAIL') return 'RED';
-  if (status === 'DUE_SOON' || status === 'AMBER') return 'AMBER';
+  if (status === 'DUE_SOON' || status === 'AMBER' || status === 'WARN') return 'AMBER';
   if (status === 'VALID' || status === 'GREEN' || status === 'PASS') return 'GREEN';
   return 'NEUTRAL';
 }

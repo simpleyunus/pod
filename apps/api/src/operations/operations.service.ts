@@ -142,7 +142,11 @@ export class OperationsService {
    * on the trip and in the append-only trail against the exact failures it
    * bypassed — an auditor can always see what was waved through and why.
    */
-  async startTrip(id: string, opts: { overrideReason?: string }, actor: { id: string; role: Role }) {
+  async startTrip(
+    id: string,
+    opts: { overrideReason?: string; warnAckReason?: string },
+    actor: { id: string; role: Role },
+  ) {
     const assignment = await this.prisma.assignment.findUnique({ where: { id }, include: { status: true } });
     if (!assignment) throw new NotFoundException(`Trip ${id} not found`);
     if (assignment.actualDepartureAt) throw new BadRequestException('This trip has already departed');
@@ -192,24 +196,100 @@ export class OperationsService {
       return this.assignmentById(id);
     }
 
+    // Every hard check passed. Advisories are a different question: they are
+    // checks that could not be answered rather than checks that were
+    // satisfied — an unweighed load, chiefly. Departing on one is a decision
+    // someone has to sign for, so it cannot be the default.
+    const unacknowledged = result.advisories.length > 0 && !assignment.gateWarnAckAt;
+    if (unacknowledged && !opts.warnAckReason) {
+      throw new BadRequestException({
+        message: 'Trip cannot depart until the outstanding checks are acknowledged',
+        advisories: result.advisories,
+      });
+    }
+
+    const acknowledging = unacknowledged && !!opts.warnAckReason;
+    if (acknowledging && actor.role !== 'ADMIN' && actor.role !== 'OWNER') {
+      throw new ForbiddenException(
+        'Only an admin can authorise departure with an outstanding compliance check',
+      );
+    }
+
+    const warned = result.advisories.length > 0 || !!assignment.gateWarnAckAt;
     const inProgress = await this.statusByCode('IN_PROGRESS');
     await this.prisma.assignment.update({
       where: { id },
       data: {
         statusId: inProgress.id,
         actualDepartureAt: new Date(),
-        gateDecision: 'PASS',
+        // WARN, not PASS: the gate column has to tell the truth about what
+        // was actually verified.
+        gateDecision: warned ? 'WARN' : 'PASS',
         gateCheckedAt: new Date(),
+        ...(acknowledging && {
+          gateWarnAckAt: new Date(),
+          gateWarnAckById: actor.id,
+          gateWarnAckReason: opts.warnAckReason,
+        }),
       },
     });
-    await this.events.record('ASSIGNMENT', id, 'GATE_CHECK', 'Gate passed — departed', { checks: result.checks }, actor.id);
+    await this.events.record(
+      'ASSIGNMENT', id, 'GATE_CHECK',
+      warned
+        ? `Departed with outstanding checks acknowledged: ${result.advisories.map((a) => a.label).join('; ')}`
+        : 'Gate passed — departed',
+      { checks: result.checks, advisories: result.advisories, acknowledgedBy: acknowledging ? actor.id : undefined },
+      actor.id,
+    );
     return this.assignmentById(id);
+  }
+
+  /**
+   * Is this trip's load question answered?
+   *
+   * Either a mass was recorded and it was within the limit, or someone with
+   * authority accepted the gap in writing. Anything else is unresolved, and a
+   * trip must not reach Delivered in that state — that is exactly the hole
+   * that let a trip show "not weighed", gate PASS and Delivered all at once.
+   */
+  private async loadState(assignmentId: string) {
+    const a = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      include: { asset: true, massRecords: { orderBy: { date: 'desc' }, take: 1 } },
+    });
+    if (!a) throw new NotFoundException(`Trip ${assignmentId} not found`);
+    const mass = a.massRecords[0]?.massLoadedKg ?? null;
+    if (mass === null) {
+      return a.gateWarnAckAt
+        ? { resolved: true as const }
+        : { resolved: false as const, reason: 'No mass recorded and no acknowledgement of departing unweighed' };
+    }
+    if (mass > a.asset.maxLoadingMassKg) {
+      return a.gateDecision === 'OVERRIDDEN'
+        ? { resolved: true as const }
+        : {
+            resolved: false as const,
+            reason: `Load of ${mass.toLocaleString()} kg exceeds the ${a.asset.maxLoadingMassKg.toLocaleString()} kg limit and has not been overridden`,
+          };
+    }
+    return { resolved: true as const };
   }
 
   /** POD capture: signature and photos land in MinIO, the trip closes. */
   async capturePod(id: string, data: any, actorId?: string) {
     const assignment = await this.prisma.assignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundException(`Trip ${id} not found`);
+
+    // R3/R4 evidence is the point of the load rules: closing a trip whose
+    // mass was never established leaves the register with a hole no later
+    // correction can fill honestly.
+    const load = await this.loadState(id);
+    if (!load.resolved) {
+      throw new BadRequestException({
+        message: 'Trip cannot be marked delivered while its load compliance is unresolved',
+        reason: load.reason,
+      });
+    }
 
     const delivered = await this.statusByCode('DELIVERED');
     await this.prisma.assignment.update({

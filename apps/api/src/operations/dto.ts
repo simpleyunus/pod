@@ -36,6 +36,9 @@ export const AssignmentUpdateSchema = AssignmentCreateSchema.partial().omit({ le
 export const StartTripSchema = z.object({
   // ADMIN only, and only meaningful when the gate has actually failed.
   overrideReason: z.string().min(10).max(1000).optional(),
+  // Acknowledging an unweighed departure. Same minimum length as an override:
+  // "ok" is not a reason anyone can audit a year later.
+  warnAckReason: z.string().min(10).max(1000).optional(),
 });
 
 export const PodCaptureSchema = z.object({

@@ -16,6 +16,8 @@ export interface GateResult {
   passed: boolean;
   checks: GateCheck[];
   failures: GateCheck[];
+  /** Passed checks that rest on an unanswered question and need a human to accept them. */
+  advisories: GateCheck[];
 }
 
 /**
@@ -51,6 +53,7 @@ export class GateService {
         passed: false,
         checks: [{ code: 'ASSIGNMENT', label: 'Trip exists', passed: false, detail: 'Trip not found' }],
         failures: [{ code: 'ASSIGNMENT', label: 'Trip exists', passed: false, detail: 'Trip not found' }],
+        advisories: [],
       };
     }
 
@@ -114,14 +117,30 @@ export class GateService {
         : fatigue.breaches.map((b) => b.detail).join('; '),
     });
 
-    // ── 4. Load ─────────────────────────────────────────────────────────
+    // ── 4. Load (element 5) ─────────────────────────────────────────────
+    //
+    // Overloading is the most-audited item in RTMS, so an unweighed load must
+    // never read as compliant. This check used to return passed:true with a
+    // note saying the vehicle had not been weighed — a green gate on an
+    // unanswered question, which is how a trip reached Delivered showing
+    // "not weighed" and PASS.
+    //
+    // Three outcomes now:
+    //   weighed, within limit  -> pass
+    //   weighed, over limit    -> hard fail (override is ADMIN + reason)
+    //   not weighed            -> advisory: cannot depart until acknowledged
+    //
+    // Advisory rather than hard fail because weighing is not always possible
+    // before departure — but it has to be a decision someone signs for, not a
+    // silence the system reads as a yes.
     const massLoadedKg = opts.massLoadedKg ?? assignment.massRecords[0]?.massLoadedKg ?? null;
     if (massLoadedKg === null) {
       checks.push({
         code: 'MASS_LIMIT',
         label: 'Load within permissible maximum',
         passed: true,
-        detail: 'Not yet weighed — record a mass before departure',
+        advisory: true,
+        detail: 'Not weighed — record a mass, or acknowledge departing unweighed',
       });
     } else {
       const max = assignment.asset.maxLoadingMassKg;
@@ -199,7 +218,8 @@ export class GateService {
     }
 
     const failures = checks.filter((c) => !c.passed);
-    return { passed: failures.length === 0, checks, failures };
+    const advisories = checks.filter((c) => c.passed && c.advisory);
+    return { passed: failures.length === 0, checks, failures, advisories };
   }
 
   /** Persist the outcome so a blocked trip shows exactly why, and an override
@@ -212,6 +232,7 @@ export class GateService {
         code: c.code,
         label: c.label,
         passed: c.passed,
+        advisory: c.advisory ?? false,
         detail: c.detail ?? null,
       })),
     });
