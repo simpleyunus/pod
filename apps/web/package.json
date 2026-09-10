@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "warm": "node scripts/warm-routes.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

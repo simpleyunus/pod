@@ -20,7 +20,7 @@ import {
 import { Dropdown, Form, Input, Layout, Menu, Modal, Typography, message } from 'antd';
 import api from '../_lib/api';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { SessionUser, clearSession, getUser, hasRole } from '../_lib/auth';
 import GlobalSearch from './GlobalSearch';
 import PodLogo from './PodLogo';
@@ -42,6 +42,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [pwBusy, setPwBusy] = useState(false);
+  const [navPending, startNav] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [pwForm] = Form.useForm();
 
   const changePassword = async (vals: any) => {
@@ -119,6 +121,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ];
 
   // Longest match wins, so /fleet does not swallow the other routes.
+  useEffect(() => {
+    setPendingKey(null);
+  }, [pathname]);
+
   const selectedKey =
     [...salesItems, ...rtmsItems]
       .filter((m) => pathname === m.key || pathname.startsWith(m.key + '/'))
@@ -153,12 +159,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       >
         <PodLogo collapsed={collapsed} />
 
+        {/* A page can take seconds to appear the first time it is opened — in
+            development Next compiles each route on demand. Without this the
+            screen simply does not move, and people click again and again. */}
+        {navPending && (
+          <div
+            role="progressbar"
+            aria-label="Loading page"
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, height: 3, zIndex: 1000,
+              // Mid-tone track: this strip crosses both the navy rail and the
+              // light canvas, so neither a white nor a dark track shows on both.
+              background: 'rgba(120,140,160,.18)', overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              height: '100%', width: '32%', borderRadius: 3,
+              background: 'linear-gradient(90deg, transparent, var(--signal) 35%, var(--signal) 65%, transparent)',
+              animation: 'podNavSweep 1.05s ease-in-out infinite',
+            }} />
+          </div>
+        )}
+
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[selectedKey]}
+          // Highlight the destination the moment it is clicked, not when it
+          // arrives — otherwise a slow route leaves the old item lit and the
+          // click looks like it was swallowed.
+          selectedKeys={[pendingKey ?? selectedKey]}
           items={menuItems}
-          onClick={({ key }) => router.push(key)}
+          onClick={({ key }) => {
+            if (key === selectedKey) return;
+            setPendingKey(key);
+            // useTransition keeps isPending true until the new route actually
+            // commits, which is the only signal that covers a dev-mode
+            // compile, a slow server render and a slow network alike.
+            startNav(() => router.push(key));
+          }}
           style={{ background: 'transparent', border: 'none', padding: '4px 8px', fontWeight: 500 }}
         />
 

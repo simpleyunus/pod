@@ -134,3 +134,11 @@ body {
 .pod-sider .ant-menu-item-selected .ant-menu-title-content,
 .pod-sider .ant-menu-item-selected .anticon { color: #fff !important; }
 .pod-sider .ant-menu-item:hover { background: rgba(255,255,255,.06) !important; }
+
+/* Sidebar navigation progress bar (see AppShell). A route that has not been
+   compiled yet can take seconds to open, and without a moving element on
+   screen the click reads as ignored. */
+@keyframes podNavSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(360%); }
+}
