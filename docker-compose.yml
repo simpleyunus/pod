@@ -18,8 +18,14 @@ services:
       timeout: 3s
       retries: 10
 
+  # Not started by default. Nothing in apps/api imports it — auth is local
+  # JWT + bcrypt (see auth.module.ts), and the KEYCLOAK_* entries in .env are
+  # placeholders for a milestone that has not landed. Left running it costs
+  # ~500 MB of the Docker VM for nothing, which hurts on a 16 GB machine.
+  # Bring it back with:  docker compose --profile auth up -d keycloak
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
+    profiles: ["auth"]
     restart: unless-stopped
     command: start-dev
     environment:
