@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import api from '../_lib/api';
 import { setSession } from '../_lib/auth';
@@ -96,6 +97,27 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotUser, setForgotUser] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  // There is no email transport in POD, so this cannot send a reset link.
+  // It raises an internal notification for an admin, who resets the password
+  // from the Team page. Always reports success, whatever the API returns, so
+  // a wrong username reveals nothing.
+  const requestReset = async () => {
+    setForgotBusy(true);
+    try {
+      await api.post('/api/auth/forgot-password', { username: forgotUser.trim() });
+    } catch {
+      /* deliberately ignored — the message must not depend on the outcome */
+    } finally {
+      setForgotBusy(false);
+      setForgotSent(true);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,10 +162,11 @@ export default function LoginPage() {
       `}</style>
 
       {/* Wordmark */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, animation: 'podLogoPulse 3s ease-in-out infinite' }}>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: 44, letterSpacing: '-0.03em', lineHeight: 1, fontFamily: 'var(--font-display)' }}>POD</span>
-        <span style={{ width: 13, height: 13, borderRadius: 3, background: ORANGE, display: 'inline-block' }} />
-      </div>
+      <img
+        src="/pod-logo.png"
+        alt="POD"
+        style={{ height: 52, width: 'auto', display: 'block', animation: 'podLogoPulse 3s ease-in-out infinite' }}
+      />
       <div style={{ marginTop: 10, fontSize: 12, letterSpacing: '.28em', textTransform: 'uppercase', color: 'rgba(255,255,255,.34)' }}>
         Vehicle import &amp; delivery
       </div>
@@ -178,15 +201,98 @@ export default function LoginPage() {
         <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,.55)', fontWeight: 600, margin: '14px 0 6px' }}>
           Password
         </label>
-        <input
-          className="pod-input"
-          style={inputStyle}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          disabled={busy}
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            className="pod-input"
+            style={{ ...inputStyle, paddingRight: 44 }}
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            disabled={busy}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            title={showPassword ? 'Hide password' : 'Show password'}
+            style={{
+              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+              width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 7,
+              color: 'rgba(255,255,255,.45)', fontSize: 15, padding: 0,
+            }}
+          >
+            {showPassword ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              // Seed from whatever is already typed above — nobody wants to
+              // enter their username twice on the same card.
+              if (!forgotOpen) setForgotUser((u) => u || username);
+              setForgotOpen((v) => !v);
+              setForgotSent(false);
+            }}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              fontSize: 11.5, color: 'rgba(255,255,255,.45)', textDecoration: 'underline',
+              textUnderlineOffset: 3,
+            }}
+          >
+            Forgot password?
+          </button>
+        </div>
+
+        {forgotOpen && (
+          <div style={{
+            marginTop: 12, padding: '12px 13px', borderRadius: 9,
+            background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.10)',
+          }}>
+            {forgotSent ? (
+              // Deliberately the same message whether or not the account
+              // exists, so this cannot be used to discover usernames.
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.62)', lineHeight: 1.55 }}>
+                If that account exists, an administrator has been notified and
+                will reset it for you.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.55)', lineHeight: 1.55, marginBottom: 9 }}>
+                  Enter your username and an administrator will be asked to reset
+                  your password.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="pod-input"
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder="Username"
+                    value={forgotUser}
+                    onChange={(e) => setForgotUser(e.target.value)}
+                    disabled={forgotBusy}
+                  />
+                  <button
+                    type="button"
+                    onClick={requestReset}
+                    disabled={forgotBusy || !forgotUser.trim()}
+                    style={{
+                      padding: '0 14px', borderRadius: 9, cursor: 'pointer',
+                      border: '1px solid rgba(255,255,255,.18)',
+                      background: 'rgba(255,255,255,.08)', color: '#fff',
+                      fontSize: 12, fontWeight: 600,
+                      opacity: forgotBusy || !forgotUser.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {forgotBusy ? '…' : 'Send'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {error && (
           <div style={{

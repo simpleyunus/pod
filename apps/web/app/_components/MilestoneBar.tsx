@@ -2,7 +2,12 @@
 
 import { CheckOutlined } from '@ant-design/icons';
 
-// The journey strip: green = done, signal orange = happening now, grey = to come.
+// The journey strip, in the same language as the traffic lights: green = done,
+// navy = happening now, grey = still to come.
+//
+// "Happening now" is deliberately navy rather than a warm accent — in the RAG
+// vocabulary amber and red mean "someone must act", and being at the current
+// stage is not a problem. Position, weight and the halo carry the emphasis.
 export default function MilestoneBar({
   statuses,
   currentStatusId,
@@ -51,7 +56,7 @@ export default function MilestoneBar({
             <div style={{
               marginTop: 7, fontSize: 10.5, lineHeight: 1.25, padding: '0 4px',
               fontWeight: current ? 700 : done ? 600 : 500,
-              color: current ? '#C13A26' : done ? '#3A4150' : '#98A0AC',
+              color: current ? '#0E1B2A' : done ? '#3A4150' : '#98A0AC',
             }}>
               {s.name}
             </div>

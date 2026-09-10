@@ -17,6 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import AppShell from '../_components/AppShell';
+import { RagDot, RAG_TONES } from '../_components/RagTag';
 import api from '../_lib/api';
 import { getUser, hasRole } from '../_lib/auth';
 
@@ -29,11 +30,14 @@ const ROLE_OPTIONS = [
   { value: 'OWNER', label: 'Owner — everything' },
 ];
 
+// Role is a rank, not a health state, so it reads as one slate ramp — darkest
+// at the top. It used to be red for OWNER and green for CONSULTANT, which
+// borrowed the traffic-light hues to say something they do not mean.
 const ROLE_PILL: Record<string, { bg: string; text: string }> = {
-  OWNER:      { bg: '#FDEDE9', text: '#C13A26' },
-  ADMIN:      { bg: '#EDF1F6', text: '#1D4ED8' },
-  CONSULTANT: { bg: '#E6F6EE', text: '#067647' },
-  VIEWER:     { bg: '#EDF1F6', text: '#616875' },
+  OWNER:      { bg: '#C9D6E2', text: '#17293C' },
+  ADMIN:      { bg: '#DAE3EC', text: '#22344A' },
+  CONSULTANT: { bg: '#E7EDF3', text: '#33495F' },
+  VIEWER:     { bg: '#F2F5F8', text: '#3A4150' },
 };
 
 export default function TeamPage() {
@@ -77,6 +81,21 @@ export default function TeamPage() {
     onError: (e: any) => message.error(e.response?.data?.message ?? 'Could not update user'),
   });
 
+  // Nobody can e-mail a reset link from POD, so a "forgot password" click ends
+  // up here: the people who can actually fix it, on the page where the fix is.
+  const { data: resetRequests } = useQuery<any[]>({
+    queryKey: ['reset-requests'],
+    queryFn: () => api.get('/api/users/reset-requests').then((r) => r.data),
+    refetchInterval: 60_000,
+  });
+
+  const dismissRequest = useMutation({
+    mutationFn: (userId: string) =>
+      api.post(`/api/users/${userId}/dismiss-reset-request`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reset-requests'] }),
+    onError: (e: any) => message.error(e.response?.data?.message ?? 'Could not dismiss'),
+  });
+
   const resetPassword = useMutation({
     mutationFn: ({ id, password }: { id: string; password: string }) =>
       api.post(`/api/users/${id}/reset-password`, { password }).then((r) => r.data),
@@ -84,6 +103,7 @@ export default function TeamPage() {
       message.success('Password reset');
       setResetting(null);
       resetForm.resetFields();
+      qc.invalidateQueries({ queryKey: ['reset-requests'] });
     },
     onError: (e: any) => message.error(e.response?.data?.message ?? 'Could not reset password'),
   });
@@ -158,7 +178,7 @@ export default function TeamPage() {
               }}>
               Edit
             </Button>
-            <Button size="small" type="text" icon={<KeyOutlined />} style={{ fontSize: 12, color: '#C13A26' }}
+            <Button size="small" type="text" icon={<KeyOutlined />} style={{ fontSize: 12, color: '#3A5570' }}
               onClick={() => setResetting(r)}>
               Reset password
             </Button>
@@ -179,6 +199,52 @@ export default function TeamPage() {
             Add user
           </Button>
         </div>
+
+        {(resetRequests?.length ?? 0) > 0 && (
+          <Card
+            size="small"
+            style={{ borderRadius: 12, border: `1px solid ${RAG_TONES.AMBER.dot}55`, background: RAG_TONES.AMBER.bg }}
+            styles={{ body: { padding: '11px 14px' } }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <RagDot rag="AMBER" title="Waiting on you" size={8} />
+              <Text style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: RAG_TONES.AMBER.text }}>
+                Password reset requested
+              </Text>
+            </div>
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              {resetRequests!.map((r) => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 12.5, color: '#171B26' }}>
+                    <strong>{r.user.fullName}</strong>
+                    <span style={{ color: '#98A0AC' }}> @{r.user.username} · {new Date(r.requestedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  </Text>
+                  <Space size={4} style={{ marginLeft: 'auto' }}>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<KeyOutlined />}
+                      disabled={!canManage(r.user)}
+                      title={canManage(r.user) ? undefined : 'Only an owner can reset this account'}
+                      onClick={() => setResetting(r.user)}
+                    >
+                      Set new password
+                    </Button>
+                    <Button
+                      size="small"
+                      type="text"
+                      style={{ color: '#98A0AC', fontSize: 12 }}
+                      loading={dismissRequest.isPending}
+                      onClick={() => dismissRequest.mutate(r.user.id)}
+                    >
+                      Dismiss
+                    </Button>
+                  </Space>
+                </div>
+              ))}
+            </Space>
+          </Card>
+        )}
 
         <Card style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
           <Table

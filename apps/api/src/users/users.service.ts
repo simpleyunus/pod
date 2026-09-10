@@ -107,6 +107,61 @@ export class UsersService {
       where: { id },
       data: { passwordHash: await bcrypt.hash(password, 10) },
     });
+    // Whatever prompted the reset, the request is now answered.
+    await this.clearResetRequests(id, 'SENT');
     return { ok: true };
+  }
+
+  // ── "Forgot password" requests ──────────────────────────────────────────
+  //
+  // POD has no mail transport, so /auth/forgot-password cannot send a reset
+  // link; it records an internal Notification instead. These two methods are
+  // the other half of that loop — without them the request would sit in a
+  // table nobody reads.
+  //
+  // The requesting user's id is carried in the body as "[user:<id>]" rather
+  // than a column, because Notification has no userId and the brief allows no
+  // further migrations. Handled requests are moved to an existing status
+  // rather than deleted, so the audit trail survives.
+
+  async listResetRequests() {
+    const rows = await this.prisma.notification.findMany({
+      where: { template: 'password-reset-request', status: 'LOGGED' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    const ids = rows
+      .map((n) => /\[user:([^\]]+)\]/.exec(n.body)?.[1])
+      .filter((v): v is string => Boolean(v));
+    const users = ids.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, username: true, fullName: true, role: true, active: true },
+        })
+      : [];
+    const byId = new Map(users.map((u) => [u.id, u]));
+
+    return rows.flatMap((n) => {
+      const userId = /\[user:([^\]]+)\]/.exec(n.body)?.[1];
+      const user = userId ? byId.get(userId) : undefined;
+      // A request whose account has since been deleted or disabled is not
+      // actionable, so it is not shown.
+      if (!user || !user.active) return [];
+      return [{ id: n.id, requestedAt: n.createdAt, user }];
+    });
+  }
+
+  /** Marks a user's outstanding requests handled: SENT when reset, SKIPPED when dismissed. */
+  async clearResetRequests(userId: string, status: 'SENT' | 'SKIPPED') {
+    const { count } = await this.prisma.notification.updateMany({
+      where: {
+        template: 'password-reset-request',
+        status: 'LOGGED',
+        body: { contains: `[user:${userId}]` },
+      },
+      data: { status, sentAt: new Date() },
+    });
+    return { cleared: count };
   }
 }

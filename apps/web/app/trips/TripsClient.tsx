@@ -89,7 +89,7 @@ export default function TripsClient() {
 
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
         <Col xs={12} md={6}><KpiCard icon={<TruckOutlined />} label="Trips" value={trips.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
-        <Col xs={12} md={6}><KpiCard icon={<ThunderboltOutlined />} label="In progress" value={inProgress} accent="#1D4ED8" tint="#E9F0FE" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<ThunderboltOutlined />} label="In progress" value={inProgress} accent="#33495F" tint="#E7EDF3" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<StopOutlined />} label="Blocked by gate" value={blocked} accent="#B42318" tint="#FEE4E2" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<SafetyOutlined />} label="Overridden" value={overridden} accent="#5B3FD4" tint="#F1EEFE" /></Col>
       </Row>

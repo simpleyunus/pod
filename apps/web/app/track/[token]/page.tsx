@@ -109,10 +109,10 @@ export default function TrackPage() {
                 </div>
                 {/* label */}
                 <div style={{ paddingBottom: last ? 0 : 16 }}>
-                  <div style={{ fontSize: 14, fontWeight: current ? 800 : done ? 700 : 500, color: current ? '#C13A26' : done ? '#171B26' : '#98A0AC', lineHeight: '18px' }}>
+                  <div style={{ fontSize: 14, fontWeight: current ? 800 : done ? 700 : 500, color: current ? '#0E1B2A' : done ? '#171B26' : '#98A0AC', lineHeight: '18px' }}>
                     {stage}
                   </div>
-                  <div style={{ fontSize: 10.5, color: current ? ORANGE : done ? '#12B76A' : '#C3C9D2', fontWeight: 600, marginTop: 1 }}>
+                  <div style={{ fontSize: 10.5, color: current ? '#3A5570' : done ? '#12B76A' : '#C3C9D2', fontWeight: 600, marginTop: 1 }}>
                     {current ? 'happening now' : done ? 'done' : ' '}
                   </div>
                 </div>
@@ -144,7 +144,7 @@ export default function TrackPage() {
               {data.prices.balance !== null && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 13, marginTop: 3 }}>
                   <span style={{ color: '#98A0AC' }}>Balance</span>
-                  <span style={{ color: data.prices.balance > 0 ? '#C13A26' : '#12B76A' }}>
+                  <span style={{ color: data.prices.balance > 0 ? '#9A6208' : '#12B76A' }}>
                     {data.prices.currency} {Number(data.prices.balance).toLocaleString()}
                   </span>
                 </div>
@@ -250,7 +250,7 @@ export default function TrackPage() {
             {uploading ? 'Sending…' : 'Choose a file'}
           </button>
           {uploadedMsg && (
-            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: uploadedMsg.startsWith('✓') ? '#12B76A' : '#C13A26' }}>
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: uploadedMsg.startsWith('✓') ? '#12B76A' : '#B42318' }}>
               {uploadedMsg}
             </div>
           )}

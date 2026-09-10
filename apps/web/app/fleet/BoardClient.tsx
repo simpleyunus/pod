@@ -33,6 +33,8 @@ import api from '../_lib/api';
 import { hasRole } from '../_lib/auth';
 import type { DealFilters } from '../_lib/hooks/useDeals';
 import { stageTone } from '../_lib/stageTone';
+import { allSignals } from '../_lib/dealSignals';
+import RagTag, { KpiCard, RagDot, RagLegend, RAG_TONES } from '../_components/RagTag';
 
 type FleetFilters = DealFilters & { createdFrom?: string; createdTo?: string };
 import { useDeals } from '../_lib/hooks/useDeals';
@@ -41,16 +43,11 @@ import AddCarDrawer from './AddCarDrawer';
 
 const { Text } = Typography;
 
-const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
-  PAID:    { text: 'Paid',    color: '#067647' },
-  PARTIAL: { text: 'Partial', color: '#9A6208' },
-  UNPAID:  { text: 'Unpaid',  color: '#B42318' },
-};
-
-// Consultant avatars — deterministic color per name
-// Identity, not status — so these stay in the cool half of the wheel and
-// never borrow the amber or green that stage chips use to mean something.
-const AVATAR_COLORS = ['#0E1B2A', '#3A5570', '#0E7490', '#2563EB', '#4C4A7D'];
+// Consultant avatars — deterministic colour per name.
+// Identity, not status. They stay inside the same slate family the stage chips
+// use, distinguished by lightness rather than hue: a bright blue disc was
+// ending up the loudest thing in a row whose actual warnings are the lamps.
+const AVATAR_COLORS = ['#0E1B2A', '#2C4E6E', '#3A5570', '#5E7C99', '#4C4A7D'];
 function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) {
   const idx = (name.charCodeAt(0) + (name.charCodeAt(1) ?? 0)) % AVATAR_COLORS.length;
   const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -63,22 +60,6 @@ function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) 
     }}>
       {initials}
     </div>
-  );
-}
-
-function KpiCard({ icon, label, value, accent, tint }: { icon: React.ReactNode; label: string; value: number; accent: string; tint: string }) {
-  return (
-    <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: '14px 16px' } }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 11, background: tint, color: accent, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {icon}
-        </div>
-        <div>
-          <div style={{ fontSize: 25, fontWeight: 700, color: '#171B26', lineHeight: 1, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>{value}</div>
-          <div style={{ fontSize: 9.5, color: '#98A0AC', marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -186,27 +167,41 @@ export default function BoardClient() {
         if (!r.currentStatus) return <Text style={{ color: '#C3C9D2', fontSize: 12 }}>—</Text>;
         const idx = statuses?.findIndex((s: any) => s.id === r.currentStatus.id) ?? -1;
         const cfg = stageTone(idx, statuses?.length ?? 0);
-        return cfg ? (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 9px', borderRadius: 6,
-            background: cfg.bg, color: cfg.text,
-            fontSize: 11, fontWeight: 600,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-            {r.currentStatus.name}
+        // Two pieces of information, two channels: the chip says WHICH stage
+        // (its tone is the pipeline ramp), the lamp says whether it is moving.
+        const sig = allSignals(r).stage;
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <RagDot rag={sig.rag} title={sig.why} />
+            {cfg ? (
+              <span style={{
+                padding: '3px 9px', borderRadius: 6,
+                background: cfg.bg, color: cfg.text,
+                fontSize: 11, fontWeight: 600,
+              }}>
+                {r.currentStatus.name}
+              </span>
+            ) : (
+              <Tag>{r.currentStatus.name}</Tag>
+            )}
           </span>
-        ) : (
-          <Tag>{r.currentStatus.name}</Tag>
         );
       },
     },
     {
       title: 'Where it is',
       key: 'location',
-      render: (_: any, r: any) => (
-        <Text style={{ fontSize: 12, color: '#616875' }}>{r.currentLocation?.name ?? '—'}</Text>
-      ),
+      render: (_: any, r: any) => {
+        const sig = allSignals(r).location;
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+            <RagDot rag={sig.rag} title={sig.why} />
+            <Text style={{ fontSize: 12, color: r.currentLocation ? '#616875' : '#98A0AC' }}>
+              {r.currentLocation?.name ?? 'Not logged'}
+            </Text>
+          </span>
+        );
+      },
     },
     {
       title: 'Payment',
@@ -216,11 +211,8 @@ export default function BoardClient() {
         return (order[a.paymentStatus] ?? -1) - (order[b.paymentStatus] ?? -1);
       },
       render: (_: any, r: any) => {
-        const p = PAYMENT_PILL[r.paymentStatus];
-        if (!p) return null;
-        return (
-          <Text style={{ fontSize: 11, fontWeight: 700, color: p.color }}>{p.text}</Text>
-        );
+        const sig = allSignals(r).payment;
+        return <span title={sig.why}><RagTag status={sig.rag} label={sig.label} size="sm" /></span>;
       },
     },
     {
@@ -245,18 +237,27 @@ export default function BoardClient() {
       width: 108,
       sorter: (a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
       defaultSortOrder: 'descend' as const,
-      render: (v: string, r: any) => (
-        <Space size={5}>
-          <Text style={{ fontSize: 11, color: '#98A0AC' }}>
-            {new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-          </Text>
-          {r.isStalled && (
-            <span title={`No movement in ${r.idleDays} days`} style={{ fontSize: 10, fontWeight: 700, color: '#C13A26', background: '#FDEDE9', borderRadius: 5, padding: '1px 6px' }}>
-              ⏱ {r.idleDays}d
-            </span>
-          )}
-        </Space>
-      ),
+      render: (v: string, r: any) => {
+        const sig = allSignals(r).updated;
+        const tone = RAG_TONES[sig.rag];
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+            <RagDot rag={sig.rag} title={sig.why} />
+            <Text style={{ fontSize: 11, color: '#98A0AC' }}>
+              {new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+            </Text>
+            {/* The idle count only earns its space once the lamp is off green. */}
+            {(sig.rag === 'AMBER' || sig.rag === 'RED') && (
+              <span title={sig.why} style={{
+                fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '1px 6px',
+                color: tone.text, background: tone.bg,
+              }}>
+                {r.idleDays}d
+              </span>
+            )}
+          </span>
+        );
+      },
     },
   ];
 
@@ -284,12 +285,12 @@ export default function BoardClient() {
 
       {/* KPI row */}
       <Row gutter={[12, 12]}>
-        <Col xs={12} md={4}><KpiCard icon={<FileTextOutlined />} label="Total" value={total} accent="#0E1B2A" tint="#EDF1F6" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<CalendarOutlined />} label="Arriving this week" value={arriving} accent="#5B3FD4" tint="#F1EEFE" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<CarOutlined />} label="In Transit" value={inTransit} accent="#1D4ED8" tint="#E9F0FE" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<CloseCircleOutlined />} label="Unpaid" value={unpaid} accent="#B42318" tint="#FEECEB" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<CheckCircleOutlined />} label="Paid" value={paid} accent="#067647" tint="#E6F6EE" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<ClockCircleOutlined />} label="Stalled" value={stalled} accent="#B8730A" tint="#FBF2E3" /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<FileTextOutlined />} label="Total" value={total} accent="#0E1B2A" tint={RAG_TONES.NEUTRAL.bg} /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<CarOutlined />} label="In Transit" value={inTransit} accent="#3A4150" tint={RAG_TONES.NEUTRAL.bg} /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<CalendarOutlined />} label="Arriving this week" value={arriving} accent={RAG_TONES.AMBER.text} tint={RAG_TONES.AMBER.bg} /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<ClockCircleOutlined />} label="Stalled" value={stalled} accent={RAG_TONES.AMBER.text} tint={RAG_TONES.AMBER.bg} /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<CloseCircleOutlined />} label="Unpaid" value={unpaid} accent={RAG_TONES.RED.text} tint={RAG_TONES.RED.bg} /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<CheckCircleOutlined />} label="Paid" value={paid} accent={RAG_TONES.GREEN.text} tint={RAG_TONES.GREEN.bg} /></Col>
       </Row>
 
       {/* Filters */}
@@ -365,13 +366,14 @@ export default function BoardClient() {
             optionType="button" size="small"
             options={[
               { label: 'All', value: 'ALL' },
-              { label: <span style={{ color: '#B42318' }}>Unpaid</span>, value: 'UNPAID' },
-              { label: <span style={{ color: '#C13A26' }}>Partial</span>, value: 'PARTIAL' },
-              { label: <span style={{ color: '#067647' }}>Paid</span>, value: 'PAID' },
+              { label: <span style={{ color: RAG_TONES.RED.text }}>Unpaid</span>, value: 'UNPAID' },
+              { label: <span style={{ color: RAG_TONES.AMBER.text }}>Partial</span>, value: 'PARTIAL' },
+              { label: <span style={{ color: RAG_TONES.GREEN.text }}>Paid</span>, value: 'PAID' },
             ]}
           />
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <RagLegend />
             <Text style={{ fontSize: 12, color: '#98A0AC', fontVariantNumeric: 'tabular-nums' }}>
               {isFetching ? '…' : `${total} car${total === 1 ? '' : 's'}`}
             </Text>

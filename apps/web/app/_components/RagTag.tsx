@@ -2,7 +2,7 @@
 
 // One vocabulary for status colour across every RTMS screen, matching the
 // board's existing pill treatment (tinted background, deep text, no borders).
-const TONES: Record<string, { bg: string; text: string; dot: string }> = {
+export const RAG_TONES: Record<string, { bg: string; text: string; dot: string }> = {
   GREEN:    { bg: '#E6F6EE', text: '#067647', dot: '#12B76A' },
   AMBER:    { bg: '#FCF3E1', text: '#9A6208', dot: '#F59E0B' },
   RED:      { bg: '#FEE4E2', text: '#B42318', dot: '#F04438' },
@@ -33,7 +33,7 @@ export default function RagTag({
   dot?: boolean;
   size?: 'sm' | 'md';
 }) {
-  const tone = TONES[status ?? 'NEUTRAL'] ?? TONES.NEUTRAL;
+  const tone = RAG_TONES[status ?? 'NEUTRAL'] ?? RAG_TONES.NEUTRAL;
   const text = label ?? (status ?? '—').replace(/_/g, ' ');
   return (
     <span
@@ -55,6 +55,51 @@ export default function RagTag({
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: tone.dot, flexShrink: 0 }} />
       )}
       {text}
+    </span>
+  );
+}
+
+/**
+ * A single traffic-light lamp, for places where a full pill would crowd the
+ * row — a table cell that already carries text, a header strip.
+ *
+ * The tinted halo is what makes it read as a lamp rather than a stray dot at
+ * 8px. `title` is required in spirit: colour on its own carries no meaning for
+ * a colour-blind or screen-reader user, so every lamp states its reason.
+ */
+export function RagDot({
+  rag, title, size = 8,
+}: { rag?: string | null; title: string; size?: number }) {
+  const tone = RAG_TONES[rag ?? 'NEUTRAL'] ?? RAG_TONES.NEUTRAL;
+  return (
+    <span
+      title={title}
+      role="img"
+      aria-label={title}
+      style={{
+        display: 'inline-block', flexShrink: 0,
+        width: size, height: size, borderRadius: '50%',
+        background: tone.dot, boxShadow: `0 0 0 2.5px ${tone.bg}`,
+      }}
+    />
+  );
+}
+
+/** Teaches the dots. Cheap to render, and it stops the colours being folklore. */
+export function RagLegend({ items }: { items?: [string, string][] }) {
+  const rows: [string, string][] = items ?? [
+    ['GREEN', 'On track'],
+    ['AMBER', 'Needs a look'],
+    ['RED', 'Overdue'],
+  ];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      {rows.map(([rag, label]) => (
+        <span key={rag} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <RagDot rag={rag} title={label} size={7} />
+          <span style={{ fontSize: 10.5, color: '#98A0AC', fontWeight: 600 }}>{label}</span>
+        </span>
+      ))}
     </span>
   );
 }

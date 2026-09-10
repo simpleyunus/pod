@@ -45,6 +45,9 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import AppShell from '../../_components/AppShell';
 import MilestoneBar from '../../_components/MilestoneBar';
+import DealSignalStrip from '../../_components/DealSignalStrip';
+import RagTag, { RagDot, RAG_TONES } from '../../_components/RagTag';
+import { paymentSignal } from '../../_lib/dealSignals';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../_lib/api';
 import { stageToneById, FALLBACK_STAGE_TONE } from '../../_lib/stageTone';
@@ -71,12 +74,6 @@ import {
 } from '../../_lib/hooks/useTracking';
 
 const { Text, Title } = Typography;
-
-const PAYMENT_PILL: Record<string, { color: string; bg: string }> = {
-  PAID:    { color: '#067647', bg: '#E6F6EE' },
-  PARTIAL: { color: '#9A6208', bg: '#FCF3E1' },
-  UNPAID:  { color: '#B42318', bg: '#FEECEB' },
-};
 
 // The icons already tell these apart, so colour is free to say something
 // else: weight. A slate ramp runs from the most consequential event to the
@@ -189,9 +186,13 @@ export default function DealDetailPage() {
   const paid = deal.payments?.reduce((s: number, p: any) => s + Number(p.amount), 0) ?? 0;
   const balance = deal.sellingPrice ? Number(deal.sellingPrice) - paid : null;
   const payStatus = paid <= 0 ? 'UNPAID' : balance !== null && balance <= 0 ? 'PAID' : 'PARTIAL';
-  const payCfg = PAYMENT_PILL[payStatus];
   const statusCfg = deal.currentStatus ? stageToneById(deal.currentStatus.id, statuses) : null;
   const paidPct = deal.sellingPrice ? Math.min(100, Math.round((paid / Number(deal.sellingPrice)) * 100)) : 0;
+  // The single-deal endpoint returns raw payments rather than the board's
+  // derived fields, so give the signals the same shape the board hands them.
+  const signalDeal = { ...deal, paymentStatus: payStatus, amountPaid: paid };
+  const paySig = paymentSignal(signalDeal);
+  const docsReceived = deal.documents?.filter((d: any) => d.received).length ?? 0;
 
   const handleChangeStatus = async (vals: any) => {
     await changeStatus.mutateAsync(vals);
@@ -323,9 +324,6 @@ export default function DealDetailPage() {
                     {deal.currentStatus.name}
                   </span>
                 ) : null}
-                {deal.currentLocation && (
-                  <Text style={{ fontSize: 11, color: '#98A0AC' }}>📍 {deal.currentLocation.name}</Text>
-                )}
               </div>
 
               <Title level={4} style={{ margin: '0 0 4px', color: '#171B26', fontWeight: 700, letterSpacing: '-0.02em', fontFamily: 'var(--font-display)' }}>
@@ -340,9 +338,9 @@ export default function DealDetailPage() {
                   <Text style={{ fontSize: 12, color: '#98A0AC' }}>via {deal.consultant.fullName}</Text>
                 )}
                 {deal.sellingPrice && (
-                  <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: payCfg?.bg, color: payCfg?.color }}>
-                    {fmt(deal.sellingPrice, deal.sellingCurrency)} · {payStatus}
-                  </span>
+                  <Text style={{ fontSize: 12, fontWeight: 700, color: '#171B26', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmt(deal.sellingPrice, deal.sellingCurrency)}
+                  </Text>
                 )}
               </Space>
             </div>
@@ -354,6 +352,11 @@ export default function DealDetailPage() {
                 <Button size="small" style={actionBtn} icon={<EditOutlined />} onClick={openEditDrawer}>Edit</Button>
               </Space>
             )}
+          </div>
+
+          {/* Five lamps: the questions people ring up to ask */}
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #EDF1F6' }}>
+            <DealSignalStrip deal={signalDeal} />
           </div>
 
           {/* The journey of every car — milestone strip from the concept doc */}
@@ -601,18 +604,16 @@ export default function DealDetailPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text style={{ color: '#98A0AC', fontSize: 12 }}>Balance</Text>
-                  <Text style={{ fontWeight: 700, color: balance && balance > 0 ? '#B42318' : '#067647', fontVariantNumeric: 'tabular-nums' }}>{fmt(balance, deal.sellingCurrency)}</Text>
+                  <Text style={{ fontWeight: 700, color: balance && balance > 0 ? RAG_TONES.RED.text : RAG_TONES.GREEN.text, fontVariantNumeric: 'tabular-nums' }}>{fmt(balance, deal.sellingCurrency)}</Text>
                 </div>
 
                 {/* progress bar, like the concept doc */}
                 {deal.sellingPrice && (
                   <div style={{ height: 5, borderRadius: 99, background: '#EDF1F6', overflow: 'hidden', marginBottom: 8 }}>
-                    <div style={{ height: '100%', width: `${paidPct}%`, borderRadius: 99, background: paidPct >= 100 ? '#12B76A' : '#3A5570', transition: 'width .3s' }} />
+                    <div style={{ height: '100%', width: `${paidPct}%`, borderRadius: 99, background: paidPct >= 100 ? RAG_TONES.GREEN.dot : RAG_TONES.AMBER.dot, transition: 'width .3s' }} />
                   </div>
                 )}
-                <span style={{ padding: '2px 9px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: payCfg?.bg, color: payCfg?.color }}>
-                  {payStatus}
-                </span>
+                <RagTag status={paySig.rag} label={paySig.label} size="sm" />
 
                 {deal.payments?.length > 0 && (
                   <div style={{ marginTop: 10, borderTop: '1px solid #EDF1F6' }}>
@@ -634,13 +635,29 @@ export default function DealDetailPage() {
                 )}
               </Card>
 
-              <Card size="small" title={<SectionTitle label="Paperwork" count={deal.documents?.filter((d: any) => d.received).length ?? 0} />} style={cardStyle}>
+              <Card
+                size="small"
+                title={
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <SectionTitle label="Paperwork" />
+                    <RagTag
+                      status={docsReceived === DOC_TYPES.length ? 'GREEN' : docsReceived === 0 ? 'RED' : 'AMBER'}
+                      label={`${docsReceived}/${DOC_TYPES.length}`}
+                      size="sm"
+                    />
+                  </span>
+                }
+                style={cardStyle}
+              >
                 <List
                   size="small"
                   dataSource={DOC_TYPES}
                   renderItem={(type) => {
                     const doc = deal.documents?.find((d: any) => d.type === type);
                     const received = doc?.received ?? false;
+                    // Three states, not two: nothing started (grey), started but
+                    // not signed off (amber), received (green).
+                    const docRag = received ? 'GREEN' : doc ? 'AMBER' : 'NEUTRAL';
                     return (
                       <List.Item
                         style={{ padding: '7px 0', borderBottom: '1px solid #EDF1F6' }}
@@ -671,14 +688,18 @@ export default function DealDetailPage() {
                         }
                       >
                         <Space size={8}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: received ? '#12B76A' : '#E3E9EF', flexShrink: 0 }} />
+                          <RagDot
+                            rag={docRag}
+                            size={7}
+                            title={received ? `${type.replace(/_/g, ' ')} received` : doc ? `${type.replace(/_/g, ' ')} started, not yet received` : `${type.replace(/_/g, ' ')} not started`}
+                          />
                           <div>
-                            <Text style={{ fontSize: 12, fontWeight: 500, color: received ? '#067647' : '#171B26' }}>
+                            <Text style={{ fontSize: 12, fontWeight: 500, color: received ? RAG_TONES.GREEN.text : '#171B26' }}>
                               {type.replace(/_/g, ' ')}
                             </Text>
                             {doc?.objectKey && (
                               <Button type="link" size="small"
-                                style={{ padding: 0, height: 'auto', fontSize: 10.5, color: doc.scanStatus === 'CLEAN' ? '#C13A26' : '#98A0AC', display: 'block' }}
+                                style={{ padding: 0, height: 'auto', fontSize: 10.5, color: doc.scanStatus === 'CLEAN' ? '#3A5570' : '#98A0AC', display: 'block' }}
                                 onClick={() => openDocument(doc.id)}>
                                 <DownloadOutlined /> {doc.filename ?? 'file'}{doc.scanStatus !== 'CLEAN' ? ` · ${doc.scanStatus.toLowerCase()}` : ''}
                               </Button>
@@ -693,13 +714,13 @@ export default function DealDetailPage() {
 
                 {clientDocs.length > 0 && (
                   <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #E3E9EF' }}>
-                    <Text style={{ fontSize: 10, fontWeight: 700, color: '#5B3FD4', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 700, color: '#3A4150', textTransform: 'uppercase', letterSpacing: 1 }}>
                       From customer
                     </Text>
                     {clientDocs.map((d: any) => (
                       <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
                         <Button type="link" size="small"
-                          style={{ padding: 0, height: 'auto', fontSize: 11.5, color: d.scanStatus === 'CLEAN' ? '#C13A26' : '#98A0AC' }}
+                          style={{ padding: 0, height: 'auto', fontSize: 11.5, color: d.scanStatus === 'CLEAN' ? '#3A5570' : '#98A0AC' }}
                           onClick={() => openDocument(d.id)}>
                           <DownloadOutlined /> {d.label ?? d.filename}
                         </Button>

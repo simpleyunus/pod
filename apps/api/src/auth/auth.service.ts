@@ -75,4 +75,50 @@ export class AuthService {
     });
     return { ok: true };
   }
+  /**
+   * Self-service password reset request.
+   *
+   * POD has no email transport — the only outbound channel is WhatsApp, aimed
+   * at customers rather than staff — so this cannot send a reset link. What it
+   * does instead is raise an INTERNAL notification that an admin picks up and
+   * acts on from the Team page, which is where the reset already lives.
+   *
+   * The response is deliberately identical whether or not the username exists,
+   * so this cannot be used to discover who has an account.
+   */
+  async requestPasswordReset(username: string) {
+    const clean = username.trim().slice(0, 60);
+    const user = clean
+      ? await this.prisma.user.findFirst({
+          where: { username: clean, active: true },
+          select: { id: true, fullName: true, username: true },
+        })
+      : null;
+
+    if (user) {
+      // One request per user per hour; a flood of rows helps nobody.
+      const recent = await this.prisma.notification.findFirst({
+        where: {
+          template: 'password-reset-request',
+          body: { contains: `[user:${user.id}]` },
+          createdAt: { gt: new Date(Date.now() - 3_600_000) },
+        },
+      });
+      if (!recent) {
+        await this.prisma.notification.create({
+          data: {
+            channel: 'INTERNAL',
+            template: 'password-reset-request',
+            body:
+              `🔑 ${user.fullName} (@${user.username}) asked for a password reset. ` +
+              `Reset it on the Team page. [user:${user.id}]`,
+            status: 'LOGGED',
+          },
+        });
+      }
+    }
+
+    return { requested: true };
+  }
+
 }

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { AuthService } from './auth.service';
 import { AuthUser, CurrentUser, Public } from './decorators';
 
+const ForgotPasswordSchema = z.object({ username: z.string().min(1).max(60) });
+
 const LoginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
@@ -17,6 +19,15 @@ const ChangePasswordSchema = z.object({
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  // Public and rate-limited: anyone can ask, nobody learns anything.
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
+  @Post('forgot-password')
+  forgotPassword(@Body() body: unknown) {
+    const { username } = ForgotPasswordSchema.parse(body);
+    return this.auth.requestPasswordReset(username);
+  }
 
   @Public()
   @Throttle({ default: { ttl: 60_000, limit: 5 } }) // brute-force guard

@@ -43,6 +43,18 @@ export class UsersController {
     return this.users.update(actor, id, UpdateUserSchema.parse(body));
   }
 
+  // Kept above the ':id' routes: Nest matches in declaration order, so a
+  // literal segment must be declared before any parameterised sibling.
+  @Get('reset-requests')
+  resetRequests() {
+    return this.users.listResetRequests();
+  }
+
+  @Post(':id/dismiss-reset-request')
+  dismissResetRequest(@Param('id') id: string) {
+    return this.users.clearResetRequests(id, 'SKIPPED');
+  }
+
   @Post(':id/reset-password')
   resetPassword(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     return this.users.resetPassword(actor, id, ResetPasswordSchema.parse(body).password);
