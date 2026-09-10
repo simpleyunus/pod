@@ -110,6 +110,24 @@ docker compose -f docker-compose.prod.yml --profile tools run --rm seed
 It is idempotent — safe to re-run. Then sign in as `owner` / `ChangeMe123!`,
 go to **Team**, create real accounts, and reset every seeded password.
 
+### Do not run the demo seed on a live server
+
+`apps/api/prisma/seed-demo.ts` exists to fill the RTMS screens for
+demonstrations — six invented drivers, twelve trips, incidents, audits. It is
+**not** production data and must not be seeded onto a server holding real
+records: an auditor reading the corrective-action register cannot tell an
+invented incident from a real one.
+
+The `seed` service in `docker-compose.prod.yml` runs `prisma db seed`, which
+is `seed.ts` (lookups, policies, the real R1 fleet) and does **not** touch
+seed-demo. Nothing extra is needed to keep it out — just do not run it by
+hand. If it does get run, every row it writes carries a `demo_` id:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile tools run --rm \
+  seed npx ts-node prisma/seed-demo.ts --clear
+```
+
 The seed also writes placeholder RTMS expiry dates (PrDP, medical, COF,
 CBRTA, insurance) so the compliance dashboard and the assignment gate have
 something to act on during testing. They all carry a `TEST-` reference:
