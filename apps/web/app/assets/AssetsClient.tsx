@@ -24,6 +24,9 @@ export default function AssetsClient() {
 
   const create = useFleetMutation((values: any) => api.post('/api/fleet/assets', values).then((r) => r.data));
 
+  // These count VEHICLES by their worst document status, not documents. The
+  // labels used to say "documents", which is only ever right by coincidence —
+  // one vehicle with two expired papers counts once here.
   const red = assets.filter((a: any) => a.complianceStatus === 'EXPIRED').length;
   const amber = assets.filter((a: any) => a.complianceStatus === 'DUE_SOON').length;
 
@@ -44,8 +47,8 @@ export default function AssetsClient() {
       <Row gutter={[12, 12]} style={{ marginBottom: 18 }}>
         <Col xs={12} md={6}><KpiCard icon={<CarOutlined />} label="Active vehicles" value={assets.length} accent="#0E1B2A" tint="#EDF1F6" /></Col>
         <Col xs={12} md={6}><KpiCard icon={<SafetyCertificateOutlined />} label="Fully compliant" value={assets.length - red - amber} accent="#067647" tint="#E6F6EE" /></Col>
-        <Col xs={12} md={6}><KpiCard icon={<ToolOutlined />} label="Documents due soon" value={amber} accent="#9A6208" tint="#FCF3E1" /></Col>
-        <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Expired documents" value={red} accent="#B42318" tint="#FEE4E2" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<ToolOutlined />} label="Vehicles with documents due soon" value={amber} accent="#9A6208" tint="#FCF3E1" /></Col>
+        <Col xs={12} md={6}><KpiCard icon={<WarningOutlined />} label="Vehicles with expired documents" value={red} accent="#B42318" tint="#FEE4E2" /></Col>
       </Row>
 
       <Input.Search

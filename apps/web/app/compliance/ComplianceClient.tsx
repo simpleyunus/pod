@@ -45,7 +45,15 @@ function ElementCard({ el }: { el: any }) {
       </div>
 
       {el.counts.total > 0 && (
-        <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 11, color: '#616875' }}>
+        // Counts are scoped to THIS element, so they will not match a
+        // fleet-wide total: a document belongs to the element it evidences.
+        // An expired CBRTA permit is a journey-management failure (element 6),
+        // not a vehicle-fitness one, so element 3 can read "1 expired" while
+        // the fleet has two expired papers across two elements.
+        <div
+          title={`Documents assessed under element ${el.number} only. A vehicle's other papers are counted under the element they evidence, so this will not match the fleet-wide total.`}
+          style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 11, color: '#616875', cursor: 'help' }}
+        >
           <span>{el.counts.VALID} valid</span>
           {el.counts.DUE_SOON > 0 && <span style={{ color: '#9A6208' }}>{el.counts.DUE_SOON} due soon</span>}
           {el.counts.EXPIRED > 0 && <span style={{ color: '#B42318', fontWeight: 600 }}>{el.counts.EXPIRED} expired</span>}
