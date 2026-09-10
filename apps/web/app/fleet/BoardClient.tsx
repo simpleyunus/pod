@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  AppstoreOutlined,
   CalendarOutlined,
   CarOutlined,
   CheckCircleOutlined,
@@ -10,7 +9,6 @@ import {
   FileTextOutlined,
   FilterOutlined,
   PlusOutlined,
-  TableOutlined,
 } from '@ant-design/icons';
 import {
   Badge,
@@ -20,7 +18,6 @@ import {
   DatePicker,
   Radio,
   Row,
-  Segmented,
   Select,
   Space,
   Table,
@@ -35,6 +32,7 @@ import { useState } from 'react';
 import api from '../_lib/api';
 import { hasRole } from '../_lib/auth';
 import type { DealFilters } from '../_lib/hooks/useDeals';
+import { stageTone } from '../_lib/stageTone';
 
 type FleetFilters = DealFilters & { createdFrom?: string; createdTo?: string };
 import { useDeals } from '../_lib/hooks/useDeals';
@@ -43,20 +41,6 @@ import AddCarDrawer from './AddCarDrawer';
 
 const { Text } = Typography;
 
-// One hue per stage so the pipeline reads at a glance.
-const STATUS_COLORS: Record<string, { dot: string; bg: string; text: string }> = {
-  'Deposit paid':            { dot: '#7C5CFC', bg: '#F1EEFE', text: '#5B3FD4' },
-  'Purchased':               { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' },
-  'Documents in progress':   { dot: '#F59E0B', bg: '#FCF3E1', text: '#9A6208' },
-  'In transit':              { dot: '#3B82F6', bg: '#E9F0FE', text: '#1D4ED8' },
-  'At border':               { dot: '#F97316', bg: '#FCEEE4', text: '#C2410C' },
-  'Cleared':                 { dot: '#14B8A6', bg: '#E4F7F4', text: '#0F766E' },
-  'Ready for delivery':      { dot: '#84CC16', bg: '#F3F9E5', text: '#4D7C0F' },
-  'Delivered':               { dot: '#12B76A', bg: '#E6F6EE', text: '#067647' },
-};
-
-const FALLBACK_STATUS_COLOR = { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' };
-
 const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
   PAID:    { text: 'Paid',    color: '#067647' },
   PARTIAL: { text: 'Partial', color: '#9A6208' },
@@ -64,7 +48,9 @@ const PAYMENT_PILL: Record<string, { text: string; color: string }> = {
 };
 
 // Consultant avatars — deterministic color per name
-const AVATAR_COLORS = ['#0E1B2A', '#3A5570', '#12805C', '#7C5CFC', '#2563EB', '#0E7490', '#B54708'];
+// Identity, not status — so these stay in the cool half of the wheel and
+// never borrow the amber or green that stage chips use to mean something.
+const AVATAR_COLORS = ['#0E1B2A', '#3A5570', '#0E7490', '#2563EB', '#4C4A7D'];
 function ConsultantAvatar({ name, size = 26 }: { name: string; size?: number }) {
   const idx = (name.charCodeAt(0) + (name.charCodeAt(1) ?? 0)) % AVATAR_COLORS.length;
   const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
@@ -96,173 +82,11 @@ function KpiCard({ icon, label, value, accent, tint }: { icon: React.ReactNode; 
   );
 }
 
-// ───────────────────────────── Kanban ─────────────────────────────
-
-function KanbanCard({ deal, canDrag, onOpen, onDragStart }: {
-  deal: any;
-  canDrag: boolean;
-  onOpen: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-}) {
-  const pay = PAYMENT_PILL[deal.paymentStatus];
-  return (
-    <div
-      draggable={canDrag}
-      onDragStart={onDragStart}
-      onClick={onOpen}
-      className="pod-kanban-card"
-      style={{
-        background: '#fff',
-        border: '1px solid #E3E9EF',
-        borderRadius: 12,
-        padding: '10px 12px',
-        boxShadow: '0 1px 2px rgba(16,24,40,.04)',
-        cursor: canDrag ? 'grab' : 'pointer',
-        userSelect: 'none',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: '#0E1B2A', fontWeight: 700, letterSpacing: 0.3 }}>
-          {deal.reference}
-        </Text>
-        {pay && <Text style={{ fontSize: 10, fontWeight: 700, color: pay.color }}>{pay.text}</Text>}
-      </div>
-      <div style={{ fontWeight: 600, color: '#171B26', fontSize: 12.5, lineHeight: 1.25 }}>
-        {deal.client?.fullName ?? '—'}
-      </div>
-      <div style={{ fontSize: 11, color: '#616875', marginTop: 1 }}>
-        {deal.make} {deal.model}{deal.year ? ` · ${deal.year}` : ''}
-      </div>
-      {deal.currentLocation && (
-        <div style={{ fontSize: 10, color: '#98A0AC', marginTop: 3 }}>📍 {deal.currentLocation.name}</div>
-      )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 7 }}>
-        {deal.consultant ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <ConsultantAvatar name={deal.consultant.fullName} size={20} />
-            <Text style={{ fontSize: 10, color: '#616875' }}>{deal.consultant.fullName.split(' ')[0]}</Text>
-          </div>
-        ) : <span />}
-        {deal.isStalled ? (
-          <span title={`No movement in ${deal.idleDays} days`} style={{ fontSize: 9, fontWeight: 700, color: '#C13A26', background: '#FDEDE9', borderRadius: 5, padding: '1px 6px' }}>
-            ⏱ {deal.idleDays}d
-          </span>
-        ) : (
-          <Text style={{ fontSize: 10, color: '#98A0AC' }}>
-            {new Date(deal.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-          </Text>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function KanbanView({ deals, statuses, canWrite }: { deals: any[]; statuses: any[]; canWrite: boolean }) {
-  const router = useRouter();
-  const qc = useQueryClient();
-  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
-
-  const moveDeal = useMutation({
-    mutationFn: ({ dealId, statusId }: { dealId: string; statusId: string }) =>
-      api.post(`/api/deals/${dealId}/status`, { statusId, note: 'Moved on the board' }).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['deals'] });
-      message.success('Stage updated');
-    },
-    onError: (e: any) => message.error(e.response?.data?.message ?? 'Could not update stage'),
-  });
-
-  const byStatus: Record<string, any[]> = {};
-  for (const d of deals) {
-    const key = d.currentStatus?.id ?? 'none';
-    (byStatus[key] ??= []).push(d);
-  }
-
-  const columns: Array<{ id: string; name: string }> = [
-    ...(byStatus['none']?.length ? [{ id: 'none', name: 'No stage' }] : []),
-    ...statuses.map((s: any) => ({ id: s.id, name: s.name })),
-  ];
-
-  const handleDrop = (e: React.DragEvent, colId: string) => {
-    e.preventDefault();
-    setDragOverCol(null);
-    if (colId === 'none') return;
-    const dealId = e.dataTransfer.getData('text/pod-deal');
-    if (!dealId) return;
-    const deal = deals.find((d) => d.id === dealId);
-    if (!deal || deal.currentStatus?.id === colId) return;
-    moveDeal.mutate({ dealId, statusId: colId });
-  };
-
-  return (
-    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, alignItems: 'flex-start' }}>
-      <style>{`
-        .pod-kanban-card { transition: box-shadow .12s, transform .12s; }
-        .pod-kanban-card:hover { box-shadow: 0 3px 10px rgba(26,99,115,.14); transform: translateY(-1px); }
-        .pod-kanban-card:active { cursor: grabbing; }
-      `}</style>
-      {columns.map((col) => {
-        const items = byStatus[col.id] ?? [];
-        const cfg = STATUS_COLORS[col.name] ?? FALLBACK_STATUS_COLOR;
-        const isOver = dragOverCol === col.id;
-        return (
-          <div
-            key={col.id}
-            onDragOver={(e) => { e.preventDefault(); if (canWrite) setDragOverCol(col.id); }}
-            onDragLeave={() => setDragOverCol((c) => (c === col.id ? null : c))}
-            onDrop={(e) => canWrite && handleDrop(e, col.id)}
-            style={{
-              flex: '0 0 250px',
-              width: 250,
-              background: isOver ? '#FDEDE9' : '#E9EEF3',
-              border: `1.5px solid ${isOver ? '#F6C9BE' : 'transparent'}`,
-              borderRadius: 14,
-              transition: 'background .12s, border-color .12s',
-            }}
-          >
-            {/* Column header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 12px 8px' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-              <Text style={{ fontSize: 11, fontWeight: 700, color: '#0E1B2A', textTransform: 'uppercase', letterSpacing: 0.6, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {col.name}
-              </Text>
-              <span style={{ fontSize: 10, fontWeight: 700, color: cfg.text, background: cfg.bg === '#E9EEF3' ? '#fff' : cfg.bg, border: '1px solid rgba(0,0,0,.04)', borderRadius: 99, padding: '1px 8px' }}>
-                {items.length}
-              </span>
-            </div>
-
-            {/* Cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 8px 10px', maxHeight: 'calc(100vh - 380px)', minHeight: 60, overflowY: 'auto' }}>
-              {items.map((d) => (
-                <KanbanCard
-                  key={d.id}
-                  deal={d}
-                  canDrag={canWrite}
-                  onOpen={() => router.push(`/deals/${d.id}`)}
-                  onDragStart={(e) => e.dataTransfer.setData('text/pod-deal', d.id)}
-                />
-              ))}
-              {!items.length && (
-                <div style={{ textAlign: 'center', padding: '18px 0', fontSize: 11, color: '#C3C9D2' }}>
-                  {isOver ? 'Drop here' : 'No cars'}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ───────────────────────────── Board ─────────────────────────────
 
 export default function BoardClient() {
   const router = useRouter();
   const [filters, setFilters] = useState<FleetFilters>({ page: 1, pageSize: 25 });
-  const [view, setView] = useState<'table' | 'kanban'>(
-    () => (typeof window !== 'undefined' && localStorage.getItem('pod.boardView') === 'kanban' ? 'kanban' : 'table'),
-  );
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<React.Key[]>([]);
   const [bulkConsultant, setBulkConsultant] = useState<string | undefined>();
@@ -287,16 +111,14 @@ export default function BoardClient() {
     onError: (e: any) => message.error(e.response?.data?.message ?? 'Bulk update failed'),
   });
 
-  // Kanban needs the whole picture, not a page of it.
-  const effectiveFilters = view === 'kanban' ? { ...filters, page: 1, pageSize: 200 } : filters;
-  const { data, isFetching } = useDeals(effectiveFilters);
+  const { data, isFetching } = useDeals(filters);
   const { data: statuses } = useStatuses();
   const { data: locations } = useLocations();
   const { data: users } = useUsers();
   const { data: countries } = useCountries();
 
   const activeFilterCount = [
-    view === 'table' ? filters.statusId : undefined,
+    filters.statusId,
     filters.locationId,
     filters.consultantId,
     filters.country,
@@ -318,10 +140,6 @@ export default function BoardClient() {
   }).length;
 
   const set = (patch: Partial<FleetFilters>) => setFilters((f) => ({ ...f, ...patch, page: 1 }));
-  const changeView = (v: 'table' | 'kanban') => {
-    setView(v);
-    localStorage.setItem('pod.boardView', v);
-  };
 
   const columns = [
     {
@@ -366,7 +184,8 @@ export default function BoardClient() {
         (statuses?.findIndex((s: any) => s.id === b.currentStatus?.id) ?? -1),
       render: (_: any, r: any) => {
         if (!r.currentStatus) return <Text style={{ color: '#C3C9D2', fontSize: 12 }}>—</Text>;
-        const cfg = STATUS_COLORS[r.currentStatus.name];
+        const idx = statuses?.findIndex((s: any) => s.id === r.currentStatus.id) ?? -1;
+        const cfg = stageTone(idx, statuses?.length ?? 0);
         return cfg ? (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -450,14 +269,6 @@ export default function BoardClient() {
           <div style={{ fontSize: 12, color: '#98A0AC', marginTop: 2 }}>Vehicle imports & deliveries</div>
         </div>
         <Space size={8}>
-          <Segmented
-            value={view}
-            onChange={(v) => changeView(v as 'table' | 'kanban')}
-            options={[
-              { value: 'table', icon: <TableOutlined />, label: 'Table' },
-              { value: 'kanban', icon: <AppstoreOutlined />, label: 'Kanban' },
-            ]}
-          />
           {hasRole('ADMIN') && (
             <Button onClick={() => router.push('/import')} icon={<FileTextOutlined />} size="small">
               Import
@@ -478,7 +289,7 @@ export default function BoardClient() {
         <Col xs={12} md={4}><KpiCard icon={<CarOutlined />} label="In Transit" value={inTransit} accent="#1D4ED8" tint="#E9F0FE" /></Col>
         <Col xs={12} md={4}><KpiCard icon={<CloseCircleOutlined />} label="Unpaid" value={unpaid} accent="#B42318" tint="#FEECEB" /></Col>
         <Col xs={12} md={4}><KpiCard icon={<CheckCircleOutlined />} label="Paid" value={paid} accent="#067647" tint="#E6F6EE" /></Col>
-        <Col xs={12} md={4}><KpiCard icon={<ClockCircleOutlined />} label="Stalled" value={stalled} accent="#C2410C" tint="#FCEEE4" /></Col>
+        <Col xs={12} md={4}><KpiCard icon={<ClockCircleOutlined />} label="Stalled" value={stalled} accent="#B8730A" tint="#FBF2E3" /></Col>
       </Row>
 
       {/* Filters */}
@@ -488,22 +299,20 @@ export default function BoardClient() {
             <FilterOutlined style={{ fontSize: 14, color: activeFilterCount ? '#0E1B2A' : '#98A0AC' }} />
           </Badge>
 
-          {view === 'table' && (
-            <Select allowClear placeholder="Stage" style={{ minWidth: 180 }} value={filters.statusId}
-              onChange={(v) => set({ statusId: v })}
-              options={statuses?.map((s: any) => {
-                const cfg = STATUS_COLORS[s.name] ?? FALLBACK_STATUS_COLOR;
-                return {
-                  value: s.id,
-                  label: (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-                      {s.name}
-                    </span>
-                  ),
-                };
-              })} />
-          )}
+          <Select allowClear placeholder="Stage" style={{ minWidth: 180 }} value={filters.statusId}
+            onChange={(v) => set({ statusId: v })}
+            options={statuses?.map((s: any, i: number) => {
+              const cfg = stageTone(i, statuses.length);
+              return {
+                value: s.id,
+                label: (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                    {s.name}
+                  </span>
+                ),
+              };
+            })} />
 
           <Select allowClear placeholder="Location" style={{ minWidth: 150 }} value={filters.locationId}
             onChange={(v) => set({ locationId: v })}
@@ -600,8 +409,7 @@ export default function BoardClient() {
         </Card>
       )}
 
-      {/* Table or Kanban */}
-      {view === 'table' ? (
+        {/* Deals table */}
         <Card style={{ borderRadius: 14, border: '1px solid #E3E9EF' }} styles={{ body: { padding: 0 } }}>
           <Table
             dataSource={items}
@@ -622,9 +430,6 @@ export default function BoardClient() {
             }}
           />
         </Card>
-      ) : (
-        <KanbanView deals={items} statuses={statuses ?? []} canWrite={canWrite} />
-      )}
 
       <AddCarDrawer open={addOpen} onClose={() => setAddOpen(false)} />
     </Space>

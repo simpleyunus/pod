@@ -47,6 +47,7 @@ import AppShell from '../../_components/AppShell';
 import MilestoneBar from '../../_components/MilestoneBar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../_lib/api';
+import { stageToneById, FALLBACK_STAGE_TONE } from '../../_lib/stageTone';
 import { hasRole } from '../../_lib/auth';
 import { useDeal } from '../../_lib/hooks/useDeals';
 import {
@@ -71,30 +72,22 @@ import {
 
 const { Text, Title } = Typography;
 
-const STATUS_COLORS: Record<string, { dot: string; bg: string; text: string }> = {
-  'Deposit paid':            { dot: '#7C5CFC', bg: '#F1EEFE', text: '#5B3FD4' },
-  'Purchased':               { dot: '#98A0AC', bg: '#EDF1F6', text: '#3A4150' },
-  'Documents in progress':   { dot: '#F59E0B', bg: '#FCF3E1', text: '#9A6208' },
-  'In transit':              { dot: '#3B82F6', bg: '#E9F0FE', text: '#1D4ED8' },
-  'At border':               { dot: '#F97316', bg: '#FCEEE4', text: '#C2410C' },
-  'Cleared':                 { dot: '#14B8A6', bg: '#E4F7F4', text: '#0F766E' },
-  'Ready for delivery':      { dot: '#84CC16', bg: '#F3F9E5', text: '#4D7C0F' },
-  'Delivered':               { dot: '#12B76A', bg: '#E6F6EE', text: '#067647' },
-};
-
 const PAYMENT_PILL: Record<string, { color: string; bg: string }> = {
   PAID:    { color: '#067647', bg: '#E6F6EE' },
   PARTIAL: { color: '#9A6208', bg: '#FCF3E1' },
   UNPAID:  { color: '#B42318', bg: '#FEECEB' },
 };
 
+// The icons already tell these apart, so colour is free to say something
+// else: weight. A slate ramp runs from the most consequential event to the
+// least, and money coming in is the one entry that earns a hue of its own.
 const EVENT_ICON: Record<string, { icon: React.ReactNode; color: string }> = {
-  STATUS_CHANGE:   { icon: <SwapOutlined />,       color: '#2563EB' },
-  LOCATION_CHANGE: { icon: <EnvironmentOutlined />, color: '#7C5CFC' },
+  STATUS_CHANGE:   { icon: <SwapOutlined />,        color: '#2C4255' },
+  LOCATION_CHANGE: { icon: <EnvironmentOutlined />, color: '#3A5570' },
   PAYMENT:         { icon: <DollarOutlined />,      color: '#12B76A' },
-  DOCUMENT:        { icon: <FileOutlined />,        color: '#F97316' },
-  MEDIA:           { icon: <PictureOutlined />,     color: '#F59E0B' },
-  NOTE:            { icon: <MessageOutlined />,     color: '#616875' },
+  DOCUMENT:        { icon: <FileOutlined />,        color: '#5A6876' },
+  MEDIA:           { icon: <PictureOutlined />,     color: '#7089A0' },
+  NOTE:            { icon: <MessageOutlined />,     color: '#93A0AD' },
   SYSTEM:          { icon: <SwapOutlined />,        color: '#C3C9D2' },
 };
 
@@ -197,7 +190,7 @@ export default function DealDetailPage() {
   const balance = deal.sellingPrice ? Number(deal.sellingPrice) - paid : null;
   const payStatus = paid <= 0 ? 'UNPAID' : balance !== null && balance <= 0 ? 'PAID' : 'PARTIAL';
   const payCfg = PAYMENT_PILL[payStatus];
-  const statusCfg = deal.currentStatus ? STATUS_COLORS[deal.currentStatus.name] : null;
+  const statusCfg = deal.currentStatus ? stageToneById(deal.currentStatus.id, statuses) : null;
   const paidPct = deal.sellingPrice ? Math.min(100, Math.round((paid / Number(deal.sellingPrice)) * 100)) : 0;
 
   const handleChangeStatus = async (vals: any) => {
@@ -474,7 +467,7 @@ export default function DealDetailPage() {
                               {ev.type.replace(/_/g, ' ').toLowerCase()}
                             </Text>
                             {ev.status && (() => {
-                              const sc = STATUS_COLORS[ev.status.name];
+                              const sc = stageToneById(ev.status.id, statuses) ?? FALLBACK_STAGE_TONE;
                               return sc ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 5, background: sc.bg, color: sc.text, fontSize: 11, fontWeight: 600 }}>
                                   <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot }} />
