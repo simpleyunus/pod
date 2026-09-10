@@ -88,10 +88,20 @@ export default function MaintenanceClient() {
                     { title: 'Next service due (date)', dataIndex: 'nextDueDate', render: (v) => fmtDate(v) },
                     {
                       title: 'Status',
-                      render: (_: any, r: any) => (
-                        <RagTag status={r.overdue ? 'RED' : (r.kmRemaining !== null && r.kmRemaining < 2500) || (r.daysRemaining !== null && r.daysRemaining < 14) ? 'AMBER' : 'GREEN'}
-                          label={r.overdue ? 'OVERDUE' : 'OK'} />
-                      ),
+                      render: (_: any, r: any) => {
+                        // The label used to be OVERDUE-or-OK while the tone had
+                        // three states, so a service two thousand km away showed
+                        // an amber lamp reading "OK".
+                        const dueSoon =
+                          (r.kmRemaining !== null && r.kmRemaining < 2500) ||
+                          (r.daysRemaining !== null && r.daysRemaining < 14);
+                        return (
+                          <RagTag
+                            status={r.overdue ? 'RED' : dueSoon ? 'AMBER' : 'GREEN'}
+                            label={r.overdue ? 'OVERDUE' : dueSoon ? 'DUE SOON' : 'OK'}
+                          />
+                        );
+                      },
                     },
                   ]}
                 />
