@@ -3,3 +3,12 @@ dist/
 .next/
 .env
 *.log
+
+# Build artefacts that were tracked by accident
+*.tsbuildinfo
+
+# macOS
+.DS_Store
+
+# Personal Claude Code permissions; launch.json is shared project config
+.claude/settings.local.json
