@@ -391,7 +391,7 @@ export default function ReportsPage() {
 
         {/* Stalled deals */}
         <Card size="small" style={{ borderRadius: 14, border: '1px solid #E3E9EF' }}
-          title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#9A6208', textTransform: 'uppercase', letterSpacing: 1.2 }}>⏱ Stalled — no movement in {data.totals.stalledDays}+ days</Text>}>
+          title={<Text style={{ fontSize: 10, fontWeight: 700, color: '#9A6208', textTransform: 'uppercase', letterSpacing: 1.2 }}>⏱ Stalled — past the patience set for their stage</Text>}>
           {data.stalled.length ? (
             <Table
               size="small"
@@ -403,7 +403,8 @@ export default function ReportsPage() {
                 { title: 'Reference', dataIndex: 'reference', render: (v: string) => <Text style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#171B26', fontWeight: 700 }}>{v}</Text> },
                 { title: 'Customer', dataIndex: 'client', render: (v: string) => <Text style={{ fontSize: 12, fontWeight: 600 }}>{v}</Text> },
                 { title: 'Stage', dataIndex: 'stage', render: (v: string) => <Text style={{ fontSize: 12, color: '#616875' }}>{v}</Text> },
-                { title: 'Idle', dataIndex: 'days', align: 'right' as const, render: (v: number) => <Text style={{ fontSize: 12, color: v >= 14 ? '#B42318' : '#9A6208', fontWeight: 700 }}>{v} days</Text> },
+                { title: 'Idle', dataIndex: 'days', align: 'right' as const, render: (v: number, r: any) => <Text style={{ fontSize: 12, color: '#B42318', fontWeight: 700 }}>{v}d <Text style={{ fontSize: 11, color: '#616875', fontWeight: 500 }}>/ {r.stalledAfter}d</Text></Text> },
+                { title: 'Why', dataIndex: 'reason', render: (v: string) => <Text style={{ fontSize: 11, color: '#616875' }}>{v}</Text> },
               ]}
             />
           ) : (

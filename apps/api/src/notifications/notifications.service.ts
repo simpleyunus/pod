@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { assessMovement } from '../deals/movement';
 import { PrismaService } from '../prisma/prisma.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { WHATSAPP_PROVIDER, WhatsAppProvider } from './whatsapp.provider';
@@ -166,17 +167,42 @@ export class NotificationsService {
 
   // ── Stalled-deal reminders (internal channel) ───────────────────────
   async createStalledReminders() {
-    const days = Number(this.config.get('STALLED_DAYS', 7));
-    const threshold = new Date(Date.now() - days * 86_400_000);
+    // Stages set their own patience and an overdue promise can flag a deal
+    // that has been touched today, so no single SQL predicate expresses the
+    // rule. Fetch the open deals and apply assessMovement — the same function
+    // the board uses, so the two cannot drift on what "stalled" means.
+    //
+    // A coarse pre-filter keeps this honest at volume: nothing can be stalled
+    // before the most impatient stage could have expired, unless its delivery
+    // date has already passed.
+    const stages = await this.prisma.dealStatus.findMany({
+      select: { stalledAfterDays: true },
+    });
+    const soonest = Math.max(
+      2,
+      Math.floor(Math.min(...stages.map((s) => s.stalledAfterDays), 10) / 2),
+    );
+    const coarse = new Date(Date.now() - soonest * 86_400_000);
 
-    const stalled = await this.prisma.deal.findMany({
+    const candidates = await this.prisma.deal.findMany({
       where: {
         archivedAt: null,
-        updatedAt: { lt: threshold },
         OR: [{ currentStatusId: null }, { currentStatus: { isTerminal: false } }],
+        AND: [
+          {
+            OR: [
+              { lastProgressAt: { lt: coarse } },
+              { lastProgressAt: null, createdAt: { lt: coarse } },
+              { expectedDeliveryDate: { lt: new Date() } },
+            ],
+          },
+        ],
       },
       include: { client: { select: { fullName: true } }, currentStatus: true },
     });
+
+    // Only red deals get chased. Amber is for the board to show, not to nag.
+    const stalled = candidates.filter((d) => assessMovement(d).state === 'STALLED');
 
     let created = 0;
     for (const deal of stalled) {
@@ -189,14 +215,14 @@ export class NotificationsService {
         },
       });
       if (recent) continue;
-      const daysStalled = Math.floor((Date.now() - deal.updatedAt.getTime()) / 86_400_000);
+      const movement = assessMovement(deal);
       await this.prisma.notification.create({
         data: {
           dealId: deal.id,
           clientId: deal.clientId,
           channel: 'INTERNAL',
           template: 'stalled-deal',
-          body: `${deal.reference} (${deal.client.fullName}) has not moved in ${daysStalled} days — still "${deal.currentStatus?.name ?? 'no stage'}"`,
+          body: `${deal.reference} (${deal.client.fullName}): ${movement.reason} — still "${deal.currentStatus?.name ?? 'no stage'}"`,
           status: 'LOGGED',
         },
       });

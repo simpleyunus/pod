@@ -6,14 +6,17 @@ const prisma = new PrismaClient();
 
 // Placeholder reference data so the board renders before the first real import.
 // The importer replaces/extends these from Sheet2's actual lookup lists.
-const STATUSES: Array<{ name: string; isTerminal?: boolean }> = [
-  { name: 'Deposit paid' },
-  { name: 'Purchased' },
-  { name: 'Documents in progress' },
-  { name: 'In transit' },
-  { name: 'At border' },
-  { name: 'Cleared' },
-  { name: 'Ready for delivery' },
+// stalledAfterDays: how long a car may sit in this stage before it is chased.
+// Explicit per stage because the stages are not comparable — customs takes
+// weeks, a handover should take days. New stages default to 10.
+const STATUSES: Array<{ name: string; isTerminal?: boolean; stalledAfterDays?: number }> = [
+  { name: 'Deposit paid',          stalledAfterDays: 7 },
+  { name: 'Purchased',             stalledAfterDays: 10 },
+  { name: 'Documents in progress', stalledAfterDays: 21 },
+  { name: 'In transit',            stalledAfterDays: 7 },
+  { name: 'At border',             stalledAfterDays: 14 },
+  { name: 'Cleared',               stalledAfterDays: 5 },
+  { name: 'Ready for delivery',    stalledAfterDays: 4 },
   { name: 'Delivered', isTerminal: true },
 ];
 
@@ -52,8 +55,13 @@ async function main() {
   for (const [i, s] of STATUSES.entries()) {
     await prisma.dealStatus.upsert({
       where: { name: s.name },
-      update: { sortOrder: i },
-      create: { name: s.name, sortOrder: i, isTerminal: s.isTerminal ?? false },
+      update: { sortOrder: i, ...(s.stalledAfterDays && { stalledAfterDays: s.stalledAfterDays }) },
+      create: {
+        name: s.name,
+        sortOrder: i,
+        isTerminal: s.isTerminal ?? false,
+        ...(s.stalledAfterDays && { stalledAfterDays: s.stalledAfterDays }),
+      },
     });
   }
 

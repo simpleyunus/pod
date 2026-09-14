@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { assessMovement } from '../deals/movement';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -30,8 +31,6 @@ export class ReportsService {
   }
 
   async summary(months = 12) {
-    const stalledDays = Number(this.config.get('STALLED_DAYS', 7));
-    const stalledThreshold = new Date(Date.now() - stalledDays * 86_400_000);
     const rates = this.fxRates();
 
     // period = the last N calendar months, inclusive of the current one.
@@ -183,14 +182,18 @@ export class ReportsService {
       receivedUsd += rec ?? 0;
     }
 
+    // Same assessment the board and the nudge sweep use, so all three agree.
     const stalled = active
-      .filter((d) => d.updatedAt < stalledThreshold && !d.currentStatus?.isTerminal)
-      .map((d) => ({
+      .map((d) => ({ deal: d, movement: assessMovement(d) }))
+      .filter(({ movement }) => movement.state === 'STALLED')
+      .map(({ deal: d, movement }) => ({
         id: d.id,
         reference: d.reference,
         client: d.client.fullName,
         stage: d.currentStatus?.name ?? 'No stage',
-        days: Math.floor((Date.now() - d.updatedAt.getTime()) / 86_400_000),
+        days: movement.idleDays,
+        stalledAfter: movement.stalledAfter,
+        reason: movement.reason,
       }))
       .sort((a, b) => b.days - a.days);
 
@@ -202,7 +205,6 @@ export class ReportsService {
         inProgress,
         delivered: firstDelivered.size,
         stalled: stalled.length,
-        stalledDays,
       },
       funnel: {
         newCars: createdInPeriod.length,

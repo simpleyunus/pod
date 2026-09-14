@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { NOTIFY_QUEUE, SEARCH_QUEUE } from '../queue/queue.module';
 import { PrismaService } from '../prisma/prisma.service';
+import { assessMovement } from './movement';
 
 export interface DealListFilters {
   statusId?: string;
@@ -62,16 +63,24 @@ export class DealsService {
       payments: { select: { amount: true, currency: true } },
     } as const;
 
-    const stalledDays = Number(process.env.STALLED_DAYS ?? 7);
     const toItem = (d: any) => {
       const paid = d.payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
       const price = d.sellingPrice ? Number(d.sellingPrice) : null;
       const paymentStatus =
         paid <= 0 ? 'UNPAID' : price !== null && paid >= price ? 'PAID' : 'PARTIAL';
-      const idleDays = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / 86_400_000);
-      const isStalled = idleDays >= stalledDays && !d.currentStatus?.isTerminal;
+      const movement = assessMovement(d);
       const { payments, costPrice, costCurrency, ...rest } = d;
-      return { ...rest, amountPaid: paid, paymentStatus, idleDays, isStalled };
+      return {
+        ...rest,
+        amountPaid: paid,
+        paymentStatus,
+        idleDays: movement.idleDays,
+        movementState: movement.state,
+        stalledAfter: movement.stalledAfter,
+        stalledReason: movement.reason,
+        // Retained so the existing board filter and KPI keep working.
+        isStalled: movement.state === 'STALLED',
+      };
     };
 
     // Payment status is derived (payments vs price), so it can't be a SQL
@@ -179,6 +188,7 @@ export class DealsService {
         currentStatusId: data.currentStatusId,
         currentLocationId: data.currentLocationId,
         leadStage: data.leadStage,
+        ...(data.currentStatusId && { lastProgressAt: new Date() }),
         ...(data.currentStatusId && {
           timeline: {
             create: {
@@ -202,9 +212,12 @@ export class DealsService {
 
   async update(id: string, data: any) {
     await this.byId(id);
+    // A stage or location change here counts as movement, same as changeStatus.
+    const moved =
+      data.currentStatusId !== undefined || data.currentLocationId !== undefined;
     const result = await this.prisma.deal.update({
       where: { id },
-      data,
+      data: { ...data, ...(moved && { lastProgressAt: new Date() }) },
       include: {
         client: true,
         currentStatus: true,
@@ -224,7 +237,7 @@ export class DealsService {
       });
       return tx.deal.update({
         where: { id },
-        data: { currentStatusId: statusId },
+        data: { currentStatusId: statusId, lastProgressAt: new Date() },
         include: { currentStatus: true, currentLocation: true, client: { select: { id: true, fullName: true, country: true } } },
       });
     });

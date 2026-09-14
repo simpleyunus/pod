@@ -152,6 +152,12 @@ model DealStatus {
   name       String  @unique
   sortOrder  Int     @default(0)
   isTerminal Boolean @default(false) // e.g. Delivered / Completed
+
+  // How long this stage may sit before it counts as stalled. Weeks at the
+  // border is routine; days in "Ready for delivery" means nobody has phoned
+  // the customer. Lives here rather than in an env var so a stage can be
+  // retuned without a redeploy.
+  stalledAfterDays Int @default(10)
   active     Boolean @default(true)
 
   dealsCurrent   Deal[]          @relation("CurrentStatus")
@@ -222,6 +228,11 @@ model Deal {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // Last real movement: a status or location change. The stalled flag reads
+  // this rather than updatedAt, so correcting a phone number no longer looks
+  // like the car moved. Null means it has never moved; fall back to createdAt.
+  lastProgressAt DateTime?
+
   timeline      TimelineEvent[]
   payments      Payment[]
   media         MediaAsset[]
@@ -236,7 +247,8 @@ model Deal {
   @@index([currentStatusId])
   @@index([currentLocationId])
   @@index([destinationCountry])
-  @@index([updatedAt]) // powers stalled-deal nudges later
+  @@index([updatedAt])
+  @@index([lastProgressAt]) // powers the stalled-deal sweep
 }
 
 // Append-only. Never updated, never deleted — this is also the audit log.

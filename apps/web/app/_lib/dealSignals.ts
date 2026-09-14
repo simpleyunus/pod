@@ -28,7 +28,11 @@ export type Signal = {
   why: string;
 };
 
-/** Mirrors the API's STALLED_DAYS default; red at double that. */
+/**
+ * Last-resort thresholds, used only when a deal arrives from an endpoint that
+ * does not send the API's assessment. The real thresholds are per stage and
+ * live in DealStatus.stalledAfterDays — do not duplicate that rule here.
+ */
 export const IDLE_WATCH_DAYS = 7;
 export const IDLE_STOP_DAYS = 14;
 /** A delivery inside this window is worth watching, not yet a problem. */
@@ -44,18 +48,26 @@ export type DealLike = {
   sellingPrice?: number | string | null;
   expectedDeliveryDate?: string | Date | null;
   updatedAt?: string | Date | null;
+  lastProgressAt?: string | Date | null;
+  createdAt?: string | Date | null;
   idleDays?: number | null;
   isStalled?: boolean | null;
+  /** The API's verdict, which knows the stage patience and the promised date. */
+  movementState?: 'MOVING' | 'SLOWING' | 'STALLED' | null;
+  stalledAfter?: number | null;
+  stalledReason?: string | null;
 };
 
 const NEUTRAL = (label: string, why: string): Signal => ({ rag: 'NEUTRAL', label, why });
 
 const daysSince = (d: DealLike) => {
   // The board's list endpoint sends idleDays; the single-deal endpoint does
-  // not, so fall back to the timestamp both of them carry.
+  // not, so fall back to the movement timestamp both of them carry. Never
+  // updatedAt — correcting a phone number is not the car moving.
   if (typeof d.idleDays === 'number') return d.idleDays;
-  if (!d.updatedAt) return null;
-  return Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / DAY);
+  const since = d.lastProgressAt ?? d.createdAt;
+  if (!since) return null;
+  return Math.floor((Date.now() - new Date(since).getTime()) / DAY);
 };
 
 const daysToEta = (d: DealLike) =>
@@ -135,20 +147,37 @@ export function paymentSignal(d: DealLike): Signal {
 }
 
 /**
- * UPDATED — staleness of the record itself.
+ * MOVEMENT — how long since the car actually moved.
  *
- * Same thresholds as the stage lamp, because they measure the same clock; the
- * difference is that this one reads NEUTRAL once the deal is closed, so a
- * finished job does not sit red forever.
+ * The API owns this judgement: it knows each stage's patience and whether the
+ * promised delivery date has passed. This function renders that verdict and
+ * only falls back to fixed thresholds for payloads that lack it. Reads NEUTRAL
+ * once the deal is closed, so a finished job does not sit red forever.
  */
 export function updatedSignal(d: DealLike): Signal {
   const idle = daysSince(d);
-  if (idle === null) return NEUTRAL('—', 'Never updated.');
+  if (idle === null) return NEUTRAL('—', 'Never moved.');
   const ago = idle === 0 ? 'today' : `${idle} ${plural(idle)} ago`;
-  if (d.currentStatus?.isTerminal) return NEUTRAL(ago, `Closed — last updated ${ago}.`);
-  if (idle >= IDLE_STOP_DAYS) return { rag: 'RED', label: ago, why: `No update in ${idle} ${plural(idle)}.` };
-  if (idle >= IDLE_WATCH_DAYS) return { rag: 'AMBER', label: ago, why: `No update in ${idle} ${plural(idle)}.` };
-  return { rag: 'GREEN', label: ago, why: `Updated ${ago}.` };
+  if (d.currentStatus?.isTerminal) return NEUTRAL(ago, `Closed — last moved ${ago}.`);
+
+  const sentence = (fallback: string) => {
+    const r = d.stalledReason;
+    return r ? `${r.charAt(0).toUpperCase()}${r.slice(1)}.` : fallback;
+  };
+
+  if (d.movementState) {
+    if (d.movementState === 'STALLED')
+      return { rag: 'RED', label: ago, why: sentence(`No movement in ${idle} ${plural(idle)}.`) };
+    if (d.movementState === 'SLOWING')
+      return { rag: 'AMBER', label: ago, why: sentence(`Quiet for ${idle} ${plural(idle)}.`) };
+    return { rag: 'GREEN', label: ago, why: `Moved ${ago}.` };
+  }
+
+  const stop = d.stalledAfter ?? IDLE_STOP_DAYS;
+  const watch = Math.max(1, Math.ceil(stop * 0.6));
+  if (idle >= stop) return { rag: 'RED', label: ago, why: `No movement in ${idle} ${plural(idle)}.` };
+  if (idle >= watch) return { rag: 'AMBER', label: ago, why: `No movement in ${idle} ${plural(idle)}.` };
+  return { rag: 'GREEN', label: ago, why: `Moved ${ago}.` };
 }
 
 const RANK: Record<Rag, number> = { NEUTRAL: 0, GREEN: 1, AMBER: 2, RED: 3 };
