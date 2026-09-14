@@ -121,11 +121,11 @@ const DRIVER_DOCS: Array<[string, string, string, number, number]> = [
 ];
 
 const ASSETS = [
-  { id: 'demo_ast_01', fleetNo: '3', registrationNo: 'KJ42MTGP', makeManufacturer: 'MERCEDES-BENZ', yearModel: 2023, vin: 'WDB93403010L845221', typeCode: 'TRUCK_TRACTOR', maxLoadingMassKg: 26000, maxPassengers: 2, odometerKm: 418_340, comments: 'Actros 2645 — primary Harare corridor horse.' },
-  { id: 'demo_ast_02', fleetNo: '4', registrationNo: 'LR88NCGP', makeManufacturer: 'SCANIA',        yearModel: 2022, vin: 'YS2R4X20005412887', typeCode: 'TRUCK_TRACTOR', maxLoadingMassKg: 26000, maxPassengers: 2, odometerKm: 612_905, comments: 'R460 — high mileage, watch service interval.' },
-  { id: 'demo_ast_03', fleetNo: '5', registrationNo: 'HN73PBGP', makeManufacturer: 'AFRIT',         yearModel: 2021, vin: 'AA9CC1830M1004417', typeCode: 'CAR_CARRIER',   maxLoadingMassKg: 24000, maxPassengers: null, odometerKm: 0, comments: '8-car double-deck carrier.' },
-  { id: 'demo_ast_04', fleetNo: '6', registrationNo: 'JD19RKGP', makeManufacturer: 'AFRIT',         yearModel: 2024, vin: 'AA9CC1830P1009982', typeCode: 'CAR_CARRIER',   maxLoadingMassKg: 24000, maxPassengers: null, odometerKm: 0, comments: '8-car double-deck carrier — newest unit.' },
-  { id: 'demo_ast_05', fleetNo: '7', registrationNo: 'FT56SVGP', makeManufacturer: 'TOYOTA',        yearModel: 2023, vin: 'AHTKB3CD402741550', typeCode: 'BAKKIE',        maxLoadingMassKg: 1000,  maxPassengers: 5, odometerKm: 96_220, comments: 'Hilux 2.8 GD-6 — recovery and border runner.' },
+  { id: 'demo_ast_01', fleetNo: '3', registrationNo: 'KJ42MTGP', makeManufacturer: 'MERCEDES-BENZ', yearModel: 2023, vin: 'WDB93403010L845221', typeCode: 'TRUCK', maxLoadingMassKg: 26000, maxPassengers: 2, odometerKm: 418_340, comments: 'Actros 2645 — primary Harare corridor horse.' },
+  { id: 'demo_ast_02', fleetNo: '4', registrationNo: 'LR88NCGP', makeManufacturer: 'SCANIA',        yearModel: 2022, vin: 'YS2R4X20005412887', typeCode: 'TRUCK', maxLoadingMassKg: 26000, maxPassengers: 2, odometerKm: 612_905, comments: 'R460 — high mileage, watch service interval.' },
+  { id: 'demo_ast_03', fleetNo: '5', registrationNo: 'HN73PBGP', makeManufacturer: 'AFRIT',         yearModel: 2021, vin: 'AA9CC1830M1004417', typeCode: 'TRAILER',   maxLoadingMassKg: 24000, maxPassengers: null, odometerKm: 0, comments: '8-car double-deck carrier.' },
+  { id: 'demo_ast_04', fleetNo: '6', registrationNo: 'JD19RKGP', makeManufacturer: 'AFRIT',         yearModel: 2024, vin: 'AA9CC1830P1009982', typeCode: 'TRAILER',   maxLoadingMassKg: 24000, maxPassengers: null, odometerKm: 0, comments: '8-car double-deck carrier — newest unit.' },
+  { id: 'demo_ast_05', fleetNo: '7', registrationNo: 'FT56SVGP', makeManufacturer: 'TOYOTA',        yearModel: 2023, vin: 'AHTKB3CD402741550', typeCode: 'LDV',        maxLoadingMassKg: 1000,  maxPassengers: 5, odometerKm: 96_220, comments: 'Hilux 2.8 GD-6 — recovery and border runner.' },
 ];
 
 const ASSET_DOCS: Array<[string, string, string, number, number]> = [

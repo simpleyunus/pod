@@ -33,6 +33,8 @@ const COMPLIANCE_KINDS: Array<{
   { code: 'PERMIT',          name: 'Permit',                     ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
   { code: 'COF',             name: 'Certificate of Fitness',     ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'VEHICLE_FITNESS' },
   { code: 'CBRTA_PERMIT',    name: 'CBRTA cross-border permit',  ownerType: 'ASSET',  leadDaysDueSoon: 45, requiredForOperation: false, rtmsElement: 'JOURNEY_MANAGEMENT' },
+  // CBRTA operator card — carried with the cross-border permit.
+  { code: 'OPERATOR_CARD',   name: 'Cross-border operator card', ownerType: 'ASSET',  leadDaysDueSoon: 45, requiredForOperation: false, rtmsElement: 'JOURNEY_MANAGEMENT' },
   // Manual 4.12 Insurance Provision.
   { code: 'INSURANCE',       name: 'Insurance cover',            ownerType: 'ASSET',  leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'VEHICLE_FITNESS' },
   // R11 "Next service due".
@@ -42,8 +44,13 @@ const COMPLIANCE_KINDS: Array<{
   { code: 'DRIVER_LICENCE',  name: 'Driving licence',            ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
   { code: 'PRDP',            name: 'Professional Driving Permit', ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true, rtmsElement: 'DRIVER_WELLNESS' },
   { code: 'MEDICAL',         name: 'Medical certificate',        ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
+  // Cross-border: no valid passport, no Beitbridge crossing. 60-day lead
+  // because renewal is slow — a month's warning is not enough.
+  { code: 'PASSPORT',        name: 'Passport',                   ownerType: 'DRIVER', leadDaysDueSoon: 60, requiredForOperation: true,  rtmsElement: 'DRIVER_WELLNESS' },
   // Manual 4.14: defensive driver training on a bi-annual basis (module M1).
   { code: 'TRAINING_DUE',    name: 'Driver training due',        ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'DRIVER_WELLNESS' },
+  // One-time induction on joining, distinct from the recurring training above.
+  { code: 'INDUCTION',       name: 'Driver induction',           ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'DRIVER_WELLNESS' },
   // P6 Substance Abuse Policy acknowledgement.
   { code: 'SUBSTANCE_ACK',   name: 'Substance policy acknowledgement', ownerType: 'DRIVER', leadDaysDueSoon: 30, requiredForOperation: false, rtmsElement: 'DRIVER_WELLNESS' },
 ];
