@@ -25,9 +25,13 @@ const LOCATIONS: Array<{ name: string; country?: string }> = [
   { name: 'With customer', country: 'ZW' },
 ];
 
-// Pilot accounts. Everyone starts with the same default password and should
-// change it via /auth/change-password on first login.
-const DEFAULT_PASSWORD = 'ChangeMe123!';
+// Pilot accounts. Everyone starts with the same password and should change it
+// via /auth/change-password on first login.
+//
+// The fallback below is published in this repository, so it is refused in
+// production — the same stance main.ts takes on JWT_SECRET. Set SEED_PASSWORD
+// when seeding anything reachable from outside your machine.
+const DEFAULT_PASSWORD = process.env.SEED_PASSWORD ?? 'ChangeMe123!';
 const USERS: Array<{ username: string; fullName: string; email: string; role: Role }> = [
   { username: 'owner',     fullName: 'POD Owner',  email: 'owner@pod.example',     role: 'OWNER' },
   { username: 'admin',     fullName: 'POD Admin',  email: 'admin@pod.example',     role: 'ADMIN' },
@@ -39,6 +43,12 @@ const USERS: Array<{ username: string; fullName: string; email: string; role: Ro
 ];
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
+    throw new Error(
+      'SEED_PASSWORD must be set when seeding in production — the default is public.',
+    );
+  }
+
   for (const [i, s] of STATUSES.entries()) {
     await prisma.dealStatus.upsert({
       where: { name: s.name },
@@ -74,7 +84,11 @@ async function main() {
   await seedRtms(prisma);
 
   console.log('Seeded reference data and users.');
-  console.log(`Default password for all seeded users: ${DEFAULT_PASSWORD}`);
+  if (process.env.SEED_PASSWORD) {
+    console.log('Seeded users with the password supplied in SEED_PASSWORD.');
+  } else {
+    console.log(`Default password for all seeded users: ${DEFAULT_PASSWORD}`);
+  }
 }
 
 main()

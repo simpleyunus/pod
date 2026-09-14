@@ -166,7 +166,7 @@ ufw or the certificate — not the application.
   - the three URLs
   - the two commands above for me to run
   - that I must still sign in and reset all seven seeded passwords — they
-    are all `ChangeMe123!` on predictable usernames (owner, admin, theo…)
+    are all the `seed.ts` fallback on predictable usernames (owner, admin, theo…)
   - how to ship a code change: I re-bundle on my Mac, scp it to ~/pod.bundle,
     and you run `git pull && docker compose -f docker-compose.prod.yml up -d --build`
   - anything you had to change to make it work

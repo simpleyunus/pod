@@ -41,7 +41,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: pod
-      POSTGRES_PASSWORD: pod_secure_password_12345
+      POSTGRES_PASSWORD: <redacted — see /root/pod/.env on the server>
       POSTGRES_DB: pod
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -59,7 +59,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://pod:pod_secure_password_12345@postgres:5432/pod
+      DATABASE_URL: postgresql://pod:<redacted>@postgres:5432/pod
       REDIS_URL: redis://redis:6379
     depends_on:
       - postgres
@@ -183,7 +183,7 @@ docker exec -e NODE_ENV=development pod_api_1 npx tsx prisma/seed-demo.ts
 # REQUIRED after any seeding — recomputes compliance RAG status
 TOKEN=$(curl -s -X POST http://localhost:4000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"owner","password":"ChangeMe123!"}' \
+  -d '{"username":"owner","password":"<owner password>"}' \
   | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
 
 curl -i -X POST http://localhost:4000/api/compliance/recompute \
@@ -201,7 +201,11 @@ install line before seeding after any `up --build`.
 ### Accounts created by `seed.ts`
 
 `owner` (OWNER), `admin` (ADMIN), `theo`, `farai`, `armstrong`, `juliet`
-(CONSULTANT), `viewer` (VIEWER) — all with password `ChangeMe123!`.
+(CONSULTANT), `viewer` (VIEWER).
+
+All seven share one password. Outside production that is the fallback literal in
+`seed.ts`; in production `SEED_PASSWORD` must be set or the seed refuses to run.
+Change every account via `/auth/change-password` immediately after seeding.
 
 ### Removing demo data
 
@@ -340,10 +344,18 @@ with `grep -n "CODE" apps/api/prisma/*.ts` before re-seeding.
 
 ## 8. Outstanding
 
-**Security.** Seven accounts share the password `ChangeMe123!`. The site runs on
-plain HTTP, so those credentials cross the internet in cleartext on every login.
-Get a domain and a TLS certificate before real data or real users, and change the
-passwords via `/auth/change-password`.
+**Security.** All seven accounts share one seeded password, and this repository
+is public — the non-production fallback in `seed.ts` is readable by anyone, as is
+this droplet's address. Rotate every account via `/auth/change-password`; until
+then, treat the instance as open. `seed.ts` now refuses to run under
+`NODE_ENV=production` without `SEED_PASSWORD`, which stops a fresh deployment
+recreating the problem, but it cannot undo passwords already seeded.
+
+The site also runs on plain HTTP, so credentials cross the internet in cleartext
+on every login. Get a domain and a TLS certificate before real data or real
+users. Note that git history retains every value ever committed, so scrubbing
+files changes what a casual reader sees, not what a determined one can recover —
+rotation is the only real remedy.
 
 **No reverse proxy.** Exposing the API on `:4000` directly works but forces the
 cross-origin setup described in section 3. Putting Caddy or nginx on port 80 to

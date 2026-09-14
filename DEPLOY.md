@@ -91,7 +91,8 @@ DigitalOcean's container registry instead; the Droplet then only runs them.
 
 - Fill in **every** `CHANGE_ME`. The development defaults are in this repo.
 - Sign in and reset all seven seeded passwords — they are all
-  `ChangeMe123!` on predictable usernames (`owner`, `admin`, `theo`…).
+  the `seed.ts` fallback on predictable usernames (`owner`, `admin`, `theo`…).
+  In production, set `SEED_PASSWORD` — the seed refuses to run without it.
 - Decide what should be public. Only `/track/<token>` is designed for
   customers; the rest is staff-only and is worth putting behind an identity
   gate (Cloudflare Access, or `basic_auth` in the Caddyfile).
@@ -107,7 +108,7 @@ rather than from your machine:
 docker compose -f docker-compose.prod.yml --profile tools run --rm seed
 ```
 
-It is idempotent — safe to re-run. Then sign in as `owner` / `ChangeMe123!`,
+It is idempotent — safe to re-run. Then sign in as `owner` with the seeded password,
 go to **Team**, create real accounts, and reset every seeded password.
 
 ### Do not run the demo seed on a live server
